@@ -6,10 +6,10 @@ import Link from "next/link";
 
 export function Footer() {
   const menu = [
-    "Changelog",
-    "Privacy",
-    "Terms",
-    "Github",
+    { name: "Github", href: "https://github.com/anypeace-oss/kliks" },
+    { name: "Terms", href: "/terms" },
+    { name: "Changelog", href: "/changelog" },
+    { name: "Privacy", href: "/privacy" },
   ]
   return (
     <footer >
@@ -27,8 +27,8 @@ export function Footer() {
           {/* This part remains the same, but the parent div is now centered */}
           {menu.map((item, index) => (
             <span key={index} className="mx-2">
-              <Link href={`/${item.toLowerCase()}`} className="hover:text-blue-400 transition-all duration-300">
-                {item}
+              <Link href={item.href} className="hover:text-blue-400 transition-all duration-300">
+                {item.name}
               </Link>
             </span>
           ))}

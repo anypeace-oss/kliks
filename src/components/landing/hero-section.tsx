@@ -6,7 +6,7 @@ import { ArrowUpRight } from "lucide-react";
 
 export const HeroSection = () => {
     return (
-        <div className="pt-30 flex items-start text-left md:text-center md:items-center justify-center flex-col gap-6 pb-10 ">
+        <div className="pt-40 flex items-start text-left md:text-center md:items-center justify-center flex-col gap-6 pb-10 ">
             <Link
                 href="/"
                 className="flex items-center rounded-full border overflow-hidden hover:bg-muted transition"
@@ -33,18 +33,8 @@ export const HeroSection = () => {
 
             <div className="flex items-center gap-2">
 
-                {/* <div className="flex items-center w-full rounded-lg border shadow-sm overflow-hidden pl-5 pr-5">
-                    <span className="text-sm  flex-shrink-0">kliks.id/</span>
-                    <Input
-                        id="username"
-                        name="username"
-                        type="text"
-                        placeholder="yourprofilename"
-                        className="flex-1 bg-background shadow-none text-sm border-0 p-0 focus-visible:ring-0 focus-visible:outline-none"
-                    />
-                </div> */}
-
                 <div className="flex items-center w-full rounded-lg border shadow-sm overflow-hidden pl-5 pr-5">
+                    <span className="text-sm  flex-shrink-0">kliks.id/</span>
                     <Input
                         id="username"
                         name="username"
@@ -54,9 +44,10 @@ export const HeroSection = () => {
                     />
                 </div>
 
+
                 {/* Tombol */}
                 <Button variant="default" className="rounded-lg px-6 py-1 text-sm">
-                    <Link href="/login">Join Waitlist</Link>
+                    <Link href="/login">Create </Link>
                 </Button>
             </div>
         </div>
