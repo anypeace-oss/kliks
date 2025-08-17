@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { IconHelp } from "@tabler/icons-react";
 import { usePathname } from "next/navigation";
+import ThemeSwitch from "./layout/theme-switch";
 export function SiteHeader() {
   const pathname = usePathname();
   const page = {
@@ -11,7 +13,7 @@ export function SiteHeader() {
     "/studio/analytics": "Analytics",
     "/studio/orders": "Orders",
 
-  };  
+  };
   const pageName = page[pathname as keyof typeof page];
 
   return (
@@ -24,17 +26,18 @@ export function SiteHeader() {
         />
         <h1 className="text-xl font-bold">{pageName}</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+          <Button variant={"ghost"} asChild size="icon" className="hidden sm:flex">
             <a
               href="https://github.com/shadcn-ui/ui/tree/main/apps/v4/app/(examples)/dashboard"
               rel="noopener noreferrer"
               target="_blank"
               className="d  ark:text-foreground"
             >
-              GitHub
+              <IconHelp />
             </a>
           </Button>
         </div>
+        <ThemeSwitch />
       </div>
     </header>
   )

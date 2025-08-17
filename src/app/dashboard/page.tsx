@@ -1,6 +1,6 @@
 // import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 // import { DataTable } from "@/components/data-table";
-// import { SectionCards } from "@/components/section-cards";
+import { SectionCards } from "@/components/section-cards";
 // import { auth } from "@/lib/auth";
 // import { headers } from "next/headers";
 // import { redirect } from "next/navigation";

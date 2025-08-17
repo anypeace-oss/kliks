@@ -4,14 +4,15 @@ import * as React from "react"
 import {
 
   IconChartBar,
-  IconDashboard,
-
-  IconFolder,
-  IconHelp,
+  IconClipboardTextFilled,
+  IconDashboardFilled,
+  IconGiftFilled,
+  IconHelpSquareFilled,
+  IconLink,
   IconListDetails,
-
+  IconMailFilled,
   IconSearch,
-  IconSettings,
+  IconSettingsFilled,
   IconUsers,
 } from "@tabler/icons-react"
 
@@ -36,7 +37,7 @@ const data = {
     {
       title: "Dashboard",
       url: "/studio/dashboard",
-      icon: IconDashboard,
+      icon: IconDashboardFilled,
     },
     {
       title: "Microsite",
@@ -46,7 +47,7 @@ const data = {
     {
       title: "Links",
       url: "/studio/links",
-      icon: IconFolder,
+      icon: IconLink,
     },
     {
       title: "Analytics",
@@ -57,24 +58,24 @@ const data = {
     {
       title: "Orders",
       url: "/studio/orders",
-      icon: IconUsers,
+      icon: IconClipboardTextFilled,
     },
   ],
   navMarketing: [
     {
       title: "Afiliates",
       url: "#",
-      icon: IconDashboard,
+      icon: IconUsers,
     },
     {
       title: "E-Mail Marketing",
       url: "#",
-      icon: IconListDetails,
+      icon: IconMailFilled,
     },
     {
       title: "Vouchers",
       url: "#",
-      icon: IconFolder,
+      icon: IconGiftFilled,
     },
   ],
 
@@ -82,12 +83,12 @@ const data = {
     {
       title: "Settings",
       url: "#",
-      icon: IconSettings,
+      icon: IconSettingsFilled,
     },
     {
       title: "Get Help",
       url: "#",
-      icon: IconHelp,
+      icon: IconHelpSquareFilled,
     },
     {
       title: "Search",

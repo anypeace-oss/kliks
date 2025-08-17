@@ -8,15 +8,16 @@ export default function Login() {
     const signWithGoogle = async () => {
         await authClient.signIn.social({
             provider: "google",
-            callbackURL: "/",
+            callbackURL: "/studio/dashboard",
         });
     };
     const signWithGithub = async () => {
         await authClient.signIn.social({
             provider: "github",
-            callbackURL: "/",
+            callbackURL: "/studio/dashboard",
         });
     };
+    
 
     return (
         <div className="relative bg-background flex flex-col items-center justify-center min-h-screen px-10">
