@@ -2,6 +2,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
+import { IconLogout } from '@tabler/icons-react'
 
 export function SignOutButton() {
     const router = useRouter()
@@ -21,9 +22,10 @@ export function SignOutButton() {
     return (
         <button
             onClick={handleLogout}
-            className="w-full text-left"
+            className="w-full text-left flex items-center"
         >
-            Sign Out
+            <IconLogout className="w-4 h-4 mr-2" />
+            Logout
         </button>
     )
 }

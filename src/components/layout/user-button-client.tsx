@@ -6,10 +6,16 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 
-import Link from "next/link";
+import { useTheme } from "next-themes";
+
+// import Link from "next/link";
 import { SignOutButton } from "./signout-button";
 import Image from "next/image";
 
@@ -22,6 +28,8 @@ interface UserButtonProps {
 }
 
 export function UserButtonClient({ user }: UserButtonProps) {
+    const { setTheme, theme } = useTheme();
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -38,16 +46,24 @@ export function UserButtonClient({ user }: UserButtonProps) {
                         <p className="text-xs text-muted-foreground">{user.email}</p>
                     )}
                 </div>
-                <DropdownMenuItem asChild>
+                {/* <DropdownMenuItem asChild>
                     <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <Link href="/settings">Settings</Link>
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Theme</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+                    <DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem>
                     <SignOutButton />
                 </DropdownMenuItem>
             </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu >
     );
 }

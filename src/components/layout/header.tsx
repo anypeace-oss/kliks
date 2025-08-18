@@ -10,5 +10,6 @@ export async function HeaderServer() {
 
   return <HeroHeader
     isAuthenticated={!!session}
+    user={session?.user}
   />;
 }

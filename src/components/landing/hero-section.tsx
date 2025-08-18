@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import Image from 'next/image'
 import { TextEffect } from '@/components/ui/text-effect'
 import { AnimatedGroup } from '@/components/ui/animated-group'
-import { HeaderServer } from '../layout/header'
+
 
 
 
@@ -32,7 +32,7 @@ const transitionVariants = {
 export default function HeroSection() {
     return (
         <>
-            <HeaderServer />
+
             <main className="overflow-hidden">
                 <div
                     aria-hidden
@@ -185,7 +185,7 @@ export default function HeroSection() {
                                 <div className="inset-shadow-2xs ring-background dark:inset-shadow-white/20 bg-background relative mx-auto max-w-6xl overflow-hidden rounded-2xl border p-4 shadow-lg shadow-zinc-950/15 ring-1">
                                     <Image
                                         className="bg-background aspect-15/8 relative hidden rounded-2xl dark:block"
-                                        src="https://res.cloudinary.com/dxurnpbrc/image/upload/v1755492300/7f61f087-a221-40ec-a5de-7e0937f21f9a.png"
+                                        src="https://res.cloudinary.com/dxurnpbrc/image/upload/v1755509954/Screen_Shot_2025-08-18_at_16.37.23_kyfcol.png"
                                         alt="app screen"
                                         width="2700"
                                         height="1440"

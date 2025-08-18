@@ -6,6 +6,7 @@ import { Languages, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import React from 'react'
 import { cn } from '@/lib/utils'
+import { UserButtonClient } from './user-button-client'
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui/select";
 
@@ -18,9 +19,14 @@ const menuItems = [
 
 interface HeroHeaderProps {
     isAuthenticated: boolean;
+    user?: {
+        name?: string | null;
+        email?: string | null;
+        image?: string | null;
+    };
 }
 
-export const HeroHeader = ({ isAuthenticated }: HeroHeaderProps) => {
+export const HeroHeader = ({ isAuthenticated, user }: HeroHeaderProps) => {
     const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
 
@@ -87,14 +93,19 @@ export const HeroHeader = ({ isAuthenticated }: HeroHeaderProps) => {
                             <div className="flex w-full flex-col space-y-3 sm:flex-row sm:gap-3 sm:space-y-0 md:w-fit">
                                 <LangChange />
                                 {isAuthenticated ? (
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        className={cn(isScrolled && 'lg:hidden')}>
-                                        <Link href="/studio/dashboard">
-                                            <span>Dashboard</span>
-                                        </Link>
-                                    </Button>
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            asChild
+                                            size="sm"
+                                            className={cn(isScrolled && 'lg:hidden')}>
+                                            <Link href="/studio/dashboard">
+                                                <span>Dashboard</span>
+                                            </Link>
+                                        </Button>
+                                        <div className={cn(isScrolled && 'lg:hidden')}>
+                                            <UserButtonClient user={user} />
+                                        </div>
+                                    </div>
                                 ) : (
                                     <Button
                                         asChild
@@ -126,7 +137,7 @@ const LangChange = () => {
     return (
         <Select>
             <SelectTrigger showChevron={false} size="sm">
-                <Languages className="size-4" />
+                <Languages />
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="en">English</SelectItem>
