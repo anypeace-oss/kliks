@@ -1,4 +1,4 @@
-// components/user-button-client.tsx
+// components/session?.user-button-client.tsx
 'use client'
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -18,32 +18,27 @@ import { useTheme } from "next-themes";
 // import Link from "next/link";
 import { SignOutButton } from "./signout-button";
 import Image from "next/image";
+import { authClient } from "@/lib/auth-client";
 
-interface UserButtonProps {
-    user?: {
-        name?: string | null;
-        email?: string | null;
-        image?: string | null;
-    };
-}
-
-export function UserButtonClient({ user }: UserButtonProps) {
+export function UserButton() {
     const { setTheme, theme } = useTheme();
+    const { data: session } = authClient.useSession();
+
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
                     <Avatar className="h-8 w-8 relative">
-                        <Image src={user?.image ?? ""} alt={user?.name ?? ""} fill />
+                        <Image src={session?.user?.image ?? ""} alt={session?.user?.name ?? ""} fill />
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
                 <div className="p-2">
-                    <p className="text-sm font-medium">{user?.name ?? 'User'}</p>
-                    {user?.email && (
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="text-sm font-medium">{session?.user?.name ?? 'session?.user'}</p>
+                    {session?.user?.email && (
+                        <p className="text-xs text-muted-foreground">{session?.user.email}</p>
                     )}
                 </div>
                 {/* <DropdownMenuItem asChild>

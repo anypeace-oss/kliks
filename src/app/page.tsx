@@ -4,13 +4,14 @@ import CallToAction from "@/components/landing/cta";
 import FeaturesSection from "@/components/landing/feature-section";
 import WallOfLoveSection from "@/components/landing/testimonial-section";
 import FooterSection from "@/components/layout/footer";
-import { HeaderServer } from "@/components/layout/header";
+import { HeroHeader } from "@/components/layout/hero-header";
+
 
 
 export default function Home() {
   return (
     <>
-      <HeaderServer />
+      <HeroHeader />
       <div className=" min-h-screen bg-background  md:border-x mx-10">
         <HeroSection />
         <FeaturesSection />

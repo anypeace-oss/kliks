@@ -49,10 +49,10 @@ export async function getCurrentUser() {
         headers: await headers()
     });
 
-    if (!session || !session.user) {
-        redirect("/login");
-        // throw new Error("Not authenticated");
-    }
+      if (!session || !session.user) {
+          redirect("/login");
+          // throw new Error("Not authenticated");
+      }
 
     return session.user;
 }
