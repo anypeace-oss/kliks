@@ -5,3 +5,5 @@ export const authClient = createAuthClient({
   baseURL: process.env.BETTER_AUTH_URL,
   cookiePrefix: "ba_", // match your server config if customized
 });
+
+

@@ -2,6 +2,8 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, schema } from "./db";
 import { nextCookies } from "better-auth/next-js";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -38,3 +40,19 @@ export const auth = betterAuth({
   },
   plugins: [nextCookies()],
 });
+
+
+
+
+export async function getCurrentUser() {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    });
+
+    if (!session || !session.user) {
+        redirect("/login");
+        // throw new Error("Not authenticated");
+    }
+
+    return session.user;
+}
