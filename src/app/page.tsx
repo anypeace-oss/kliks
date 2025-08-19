@@ -13,7 +13,7 @@ export default function Home() {
   return (
     <>
       <HeroHeader />
-      <div className=" min-h-screen bg-background  md:border-x md:mx-10">
+      <div className=" min-h-screen bg-background  ">
         <HeroSection />
         <FeaturesSection />
         <WallOfLoveSection />

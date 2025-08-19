@@ -92,7 +92,8 @@ export const HeroHeader = () => {
                     <Button
                       asChild
                       size="sm"
-                      className={cn(isScrolled && 'lg:hidden')}>
+                      // className={cn(isScrolled && 'lg:hidden')}
+                      >
                       <Link href="/studio/dashboard">
                         <span>Dashboard</span>
                       </Link>
