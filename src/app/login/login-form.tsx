@@ -86,11 +86,11 @@ export default function LoginForm() {
                                 </div>
                             </Button>
                             <div className="relative my-6 flex items-center">
-                                <div className="flex-grow border-t" />
+                                <div className="flex-grow border-t border-dashed" />
                                 <span className="mx-4 text-sm  font-mono">
                                     OR
                                 </span>
-                                <div className="flex-grow border-t" />
+                                <div className="flex-grow border-t border-dashed" />
                             </div>
 
                             <Button
@@ -116,20 +116,11 @@ export default function LoginForm() {
                                     Continue with GitHub
                                 </div>
                             </Button>
-                            <Button
-                                variant={"outline"}
 
-                                onClick={() => signWithGithub()}
-                            >
-                                <div className="flex items-center gap-2">
-
-                                    Log in With Email
-                                </div>
-                            </Button>
                         </div>
                     </div>
 
-                    <p className="text-xs  text-left font-mono dark:text-foreground">
+                    <p className="text-xs  text-left font-mono dark:text-foreground border-t border-dashed pt-6">
                         By signing in you agree to our{" "}
                         <a href="/terms" className="underline">
                             Terms of service
