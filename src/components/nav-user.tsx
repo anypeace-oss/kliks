@@ -1,5 +1,3 @@
-
-
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -28,7 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
-import { useRouter } from "next/navigation"
+import { redirect } from "next/navigation"
 
 export function NavUser({
 }: {
@@ -40,13 +38,12 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { data: session, isPending } = authClient.useSession();
-  const router = useRouter();
 
   const handleLogout = async () => {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          router.push("/login"); // redirect to login page
+          redirect("/login")
         },
       },
     });
@@ -130,3 +127,4 @@ export function NavUser({
     </SidebarMenu>
   )
 }
+

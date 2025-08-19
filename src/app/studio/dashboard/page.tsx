@@ -1,21 +1,17 @@
+"use client"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-// import { DataTable } from "@/components/data-table";
-// import { SectionCards } from "@/components/section-cards";
-// import { auth } from "@/lib/auth";
-// import { headers } from "next/headers";
-// import { redirect } from "next/navigation";
 
 import { SectionCards } from "@/components/section-cards";
+import { authClient } from "@/lib/auth-client";
+import { redirect } from "next/navigation";
+
 
 export default function Page() {
-    // const session = await auth.api.getSession({
-    //     headers: await headers()
-    // })
+    const { data: session, isPending } = authClient.useSession()
 
-    // if (!session) {
-    //     redirect("/login")
-    // }
-
+    if (session && isPending) {
+        redirect("/studio/dashboard");
+    }
     return (
         <div className="flex flex-1 flex-col">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">

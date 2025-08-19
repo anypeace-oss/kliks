@@ -7,10 +7,10 @@ export default async function AuthProvider({ children }: { children: React.React
     const session = await auth.api.getSession({
         headers: await headers()
     });
-
-    if (!session) {
+    if (!session || !session.user) {
         redirect('/login');
     }
+
 
     return <>{children}</>;
 }

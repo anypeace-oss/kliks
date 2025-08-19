@@ -16,13 +16,27 @@ import {
 import { useTheme } from "next-themes";
 
 // import Link from "next/link";
-import { SignOutButton } from "./signout-button";
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
+import { IconLogout } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
 
 export function UserButton() {
     const { setTheme, theme } = useTheme();
     const { data: session } = authClient.useSession();
+    const router = useRouter()
+
+
+    const handleLogout = async () => {
+        await authClient.signOut({
+            fetchOptions: {
+                onSuccess: () => {
+                    router.push("/");
+                },
+            },
+        });
+    };
+
 
 
     return (
@@ -55,8 +69,9 @@ export function UserButton() {
                     <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                    <SignOutButton />
+                <DropdownMenuItem className="w-full text-left flex items-center" onClick={handleLogout}>
+                    <IconLogout className="w-4 h-4 mr-2" />
+                    Logout
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu >

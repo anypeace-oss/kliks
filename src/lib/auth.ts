@@ -41,18 +41,15 @@ export const auth = betterAuth({
   plugins: [nextCookies()],
 });
 
-
-
-
 export async function getCurrentUser() {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    });
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-      if (!session || !session.user) {
-          redirect("/login");
-          // throw new Error("Not authenticated");
-      }
+  if (!session || !session.user) {
+    redirect("/login");
+    // throw new Error("Not authenticated");
+  }
 
-    return session.user;
+  return session.user;
 }
