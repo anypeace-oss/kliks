@@ -44,7 +44,7 @@ export const HeroHeader = () => {
               <Link
                 href="/"
                 aria-label="home"
-                className="flex items-center space-x-2">
+                className="flex items-center space-x-2 ">
                 <Logo />
               </Link>
 
@@ -105,13 +105,14 @@ export const HeroHeader = () => {
                   <Button
                     asChild
                     size="sm"
-                    className={cn(isScrolled && 'lg:hidden')}>
+                  // className={cn(isScrolled && 'lg:hidden')}
+                  >
                     <Link href="/login">
                       <span>Sign in</span>
                     </Link>
                   </Button>
                 )}
-                <Button
+                {/* <Button
                   asChild
                   size="sm"
                   className={cn(isScrolled ? 'lg:inline-flex' : 'hidden')}>
@@ -119,7 +120,7 @@ export const HeroHeader = () => {
 
                     <span>Get Started</span>
                   </Link>
-                </Button>
+                </Button> */}
               </div>
             </div>
           </div>
