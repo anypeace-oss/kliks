@@ -1,17 +1,17 @@
-import { IconClick } from '@tabler/icons-react';
-import { cn } from '../lib/utils'
 
-export const Logo = ({ className }: { className?: string; }) => {
+import Image from 'next/image';
+
+export const Logo = () => {
     return (
         <div className="flex items-center gap-4">
-            <IconClick className={cn('text-foreground ', className)} /> <span className='font-mono font-medium'>KLIKS</span>
+            <Image src={"/logo-mono.svg"} width={40} height={40} alt='logo' className='dark:invert' /> <span className='font-mono font-medium'>Kreeasi</span>
         </div>
     )
 }
 
-export const LogoIcon = ({ className }: { className?: string; }) => {
+export const LogoIcon = () => {
     return (
-        <IconClick className={cn('text-foreground', className)} />
+        <Image src={"/logo-mono.svg"} width={40} height={40} alt='logo' className='dark:invert' />
     )
 }
 

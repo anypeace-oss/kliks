@@ -37,8 +37,8 @@ export const HeroHeader = () => {
     <header>
       <nav
         data-state={menuState && 'active'}
-        className="fixed z-20 w-full px-2">
-        <div className={cn('mx-auto mt-2 max-w-6xl px-6 transition-all duration-300 lg:px-12', isScrolled && 'bg-background/50 max-w-4xl  border backdrop-blur-lg lg:px-5')}>
+        className="fixed z-20 w-full px-2 ">
+        <div className={cn('rounded-xl mx-auto mt-2 max-w-6xl px-6 transition-all duration-300 lg:px-12', isScrolled && 'bg-background/50 max-w-5xl  border backdrop-blur-lg lg:px-5')}>
           <div className="relative flex flex-wrap items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
             <div className="flex w-full justify-between lg:w-auto">
               <Link
@@ -116,7 +116,7 @@ export const HeroHeader = () => {
                   size="sm"
                   className={cn(isScrolled ? 'lg:inline-flex' : 'hidden')}>
                   <Link href="#">
-                  
+
                     <span>Get Started</span>
                   </Link>
                 </Button>
