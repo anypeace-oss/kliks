@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Mail, SendHorizonal } from 'lucide-react'
 
-export default function CallToAction() {
+export default function CTASection() {
     return (
         <section className="py-16 md:py-32">
             <div className="mx-auto max-w-5xl px-6">

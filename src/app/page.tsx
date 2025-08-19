@@ -1,6 +1,6 @@
 
 import HeroSection from "@/components/landing/hero-section";
-import CallToAction from "@/components/landing/cta";
+import CallToAction from "@/components/landing/cta-section";
 import FeaturesSection from "@/components/landing/feature-section";
 import WallOfLoveSection from "@/components/landing/testimonial-section";
 import FooterSection from "@/components/layout/footer";
