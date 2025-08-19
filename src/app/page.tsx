@@ -5,6 +5,7 @@ import FeaturesSection from "@/components/landing/feature-section";
 import WallOfLoveSection from "@/components/landing/testimonial-section";
 import FooterSection from "@/components/layout/footer";
 import { HeroHeader } from "@/components/layout/hero-header";
+import PricingSection from "@/components/landing/pricing-section";
 
 
 
@@ -16,6 +17,7 @@ export default function Home() {
         <HeroSection />
         <FeaturesSection />
         <WallOfLoveSection />
+        <PricingSection />
         <CallToAction />
         <FooterSection />
       </div>
