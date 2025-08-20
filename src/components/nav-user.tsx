@@ -1,14 +1,13 @@
+"use client"
 import {
   IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconSettings2,
 } from "@tabler/icons-react"
-
 import {
   Avatar,
   AvatarFallback,
-  AvatarImage,
 } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -26,7 +25,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export function NavUser({
 }: {
@@ -37,13 +37,14 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session } = authClient.useSession();
+  const router = useRouter()
 
   const handleLogout = async () => {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          redirect("/login")
+          router.push("/");
         },
       },
     });
@@ -57,14 +58,14 @@ export function NavUser({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage
-                  src={session?.user?.image || undefined}
-                  alt={`${session?.user?.name ?? "user"} image`}
-                />
-                <AvatarFallback className="rounded-lg">
-                  {session?.user?.name?.[0]?.toUpperCase() ?? "?"}
-                </AvatarFallback>
+              <Avatar className="h-8 w-8 rounded-lg">
+                {session?.user?.image ? (
+                  <Image src={session.user.image} alt={session.user.name ?? ""} fill />
+                ) : (
+                  <AvatarFallback className="rounded-lg">
+                    {session?.user?.name?.[0]?.toUpperCase() ?? "K"}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{session?.user.name}</span>
@@ -83,18 +84,6 @@ export function NavUser({
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg grayscale">
-                  <AvatarImage
-                    src={session?.user?.image || undefined}
-                    alt={`${session?.user?.name ?? "user"} image`}
-                  />
-                  <AvatarFallback className="rounded-lg">
-                    {isPending
-                      ? "…" // tanda loading sementara
-                      : session?.user?.name?.[0]?.toUpperCase() ?? "?"}
-                  </AvatarFallback>
-                </Avatar>
-
 
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{session?.user.name}</span>

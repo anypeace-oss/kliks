@@ -1,7 +1,7 @@
 // components/session?.user-button-client.tsx
 'use client'
 import { Button } from "@/components/ui/button";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
 
 import { useTheme } from "next-themes";
 
-// import Link from "next/link";
+import Link from "next/link";
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 import { IconLogout } from "@tabler/icons-react";
@@ -43,8 +43,14 @@ export function UserButton() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
-                    <Avatar className="h-8 w-8 relative">
-                        <Image src={session?.user?.image ?? ""} alt={session?.user?.name ?? ""} fill />
+                    <Avatar className="h-8 w-8 rounded-lg">
+                        {session?.user?.image ? (
+                            <Image src={session.user.image} alt={session.user.name ?? ""} fill />
+                        ) : (
+                            <AvatarFallback className="rounded-lg">
+                                {session?.user?.name?.[0]?.toUpperCase() ?? "K"}
+                            </AvatarFallback>
+                        )}
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
@@ -55,12 +61,10 @@ export function UserButton() {
                         <p className="text-xs text-muted-foreground">{session?.user.email}</p>
                     )}
                 </div>
-                {/* <DropdownMenuItem asChild>
-                    <Link href="/profile">Profile</Link>
-                </DropdownMenuItem>
+
                 <DropdownMenuItem asChild>
-                    <Link href="/settings">Settings</Link>
-                </DropdownMenuItem> */}
+                    <Link href="/studio/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Theme</DropdownMenuLabel>
                 <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
