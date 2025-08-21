@@ -6,8 +6,6 @@ import {
   integer,
   decimal,
   jsonb,
-  uuid,
-  serial,
 } from "drizzle-orm/pg-core";
 
 // ===== AUTH TABLES (from auth-schema.ts) =====
@@ -71,7 +69,9 @@ export const verification = pgTable("verification", {
 
 // Profile/Page utama user
 export const profiles = pgTable("profiles", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -82,9 +82,12 @@ export const profiles = pgTable("profiles", {
   backgroundImage: text("background_image"), // URL background
 
   // Template & Theme selection
-  layoutTemplateId: text("layout_template_id").references(() => layoutTemplates.id, {
-    onDelete: "set null",
-  }),
+  layoutTemplateId: text("layout_template_id").references(
+    () => layoutTemplates.id,
+    {
+      onDelete: "set null",
+    }
+  ),
   colorSchemeId: text("color_scheme_id").references(() => colorSchemes.id, {
     onDelete: "set null",
   }),
@@ -119,7 +122,9 @@ export const profiles = pgTable("profiles", {
 
 // Links/buttons di profile
 export const links = pgTable("links", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   profileId: text("profile_id")
     .notNull()
     .references(() => profiles.id, { onDelete: "cascade" }),
@@ -172,7 +177,9 @@ export const links = pgTable("links", {
 
 // Kategori produk digital
 export const productCategories = pgTable("product_categories", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
@@ -186,7 +193,9 @@ export const productCategories = pgTable("product_categories", {
 
 // Produk digital
 export const digitalProducts = pgTable("digital_products", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -247,11 +256,15 @@ export const digitalProducts = pgTable("digital_products", {
 // ===== ORDERS & PAYMENTS =====
 
 export const orders = pgTable("orders", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   orderNumber: text("order_number").notNull().unique(), // INV-001, dll
 
   // Customer info (bisa guest atau registered user)
-  customerId: text("customer_id").references(() => user.id, { onDelete: "set null" }),
+  customerId: text("customer_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
   customerEmail: text("customer_email").notNull(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone"),
@@ -289,7 +302,9 @@ export const orders = pgTable("orders", {
 
 // Item dalam order
 export const orderItems = pgTable("order_items", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   orderId: text("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
@@ -316,7 +331,9 @@ export const orderItems = pgTable("order_items", {
 
 // Click analytics untuk links
 export const linkClicks = pgTable("link_clicks", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   linkId: text("link_id")
     .notNull()
     .references(() => links.id, { onDelete: "cascade" }),
@@ -337,7 +354,9 @@ export const linkClicks = pgTable("link_clicks", {
 
 // Profile views
 export const profileViews = pgTable("profile_views", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   profileId: text("profile_id")
     .notNull()
     .references(() => profiles.id, { onDelete: "cascade" }),
@@ -360,7 +379,9 @@ export const profileViews = pgTable("profile_views", {
 
 // Layout template yang bisa dipilih user
 export const layoutTemplates = pgTable("layout_templates", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   description: text("description"),
@@ -385,7 +406,9 @@ export const layoutTemplates = pgTable("layout_templates", {
 
 // Color schemes/themes
 export const colorSchemes = pgTable("color_schemes", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
 
@@ -415,14 +438,19 @@ export const colorSchemes = pgTable("color_schemes", {
 
 // Program affiliate untuk setiap produk
 export const affiliatePrograms = pgTable("affiliate_programs", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   productId: text("product_id")
     .notNull()
     .references(() => digitalProducts.id, { onDelete: "cascade" }),
 
   // Commission settings
   commissionType: text("commission_type").notNull().default("percentage"), // percentage, fixed
-  commissionValue: decimal("commission_value", { precision: 8, scale: 2 }).notNull(),
+  commissionValue: decimal("commission_value", {
+    precision: 8,
+    scale: 2,
+  }).notNull(),
 
   // Program status
   isActive: boolean("is_active").notNull().default(true),
@@ -442,7 +470,9 @@ export const affiliatePrograms = pgTable("affiliate_programs", {
 
 // Affiliate relationships (siapa yang jadi affiliate dari produk apa)
 export const affiliates = pgTable("affiliates", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   affiliateProgramId: text("affiliate_program_id")
     .notNull()
     .references(() => affiliatePrograms.id, { onDelete: "cascade" }),
@@ -474,7 +504,9 @@ export const affiliates = pgTable("affiliates", {
 
 // Tracking affiliate clicks
 export const affiliateClicks = pgTable("affiliate_clicks", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   affiliateId: text("affiliate_id")
     .notNull()
     .references(() => affiliates.id, { onDelete: "cascade" }),
@@ -491,7 +523,9 @@ export const affiliateClicks = pgTable("affiliate_clicks", {
 
 // Commission dari penjualan affiliate
 export const affiliateCommissions = pgTable("affiliate_commissions", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   affiliateId: text("affiliate_id")
     .notNull()
     .references(() => affiliates.id, { onDelete: "cascade" }),
@@ -501,8 +535,14 @@ export const affiliateCommissions = pgTable("affiliate_commissions", {
 
   // Commission details
   saleAmount: decimal("sale_amount", { precision: 10, scale: 2 }).notNull(),
-  commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  commissionRate: decimal("commission_rate", {
+    precision: 5,
+    scale: 2,
+  }).notNull(),
 
   // Status
   status: text("status").notNull().default("pending"), // pending, approved, paid
@@ -516,7 +556,9 @@ export const affiliateCommissions = pgTable("affiliate_commissions", {
 // ===== SUBSCRIPTIONS (untuk future monetization) =====
 
 export const subscriptionPlans = pgTable("subscription_plans", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 8, scale: 2 }).notNull(),
@@ -542,7 +584,9 @@ export const subscriptionPlans = pgTable("subscription_plans", {
 });
 
 export const userSubscriptions = pgTable("user_subscriptions", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),

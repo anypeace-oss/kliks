@@ -3,17 +3,21 @@ import { profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  ProfileCreateSchema,
+  ProfileUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/profiles - Get all profiles for the current user
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
+
     const userProfiles = await db
       .select()
       .from(profiles)
       .where(eq(profiles.userId, user.id));
-    
+
     return NextResponse.json(userProfiles);
   } catch (error) {
     console.error("Error fetching profiles:", error);
@@ -28,26 +32,31 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = ProfileCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     // Check if user already has a profile with this username
     const existingProfile = await db
       .select()
       .from(profiles)
       .where(
-        and(
-          eq(profiles.userId, user.id),
-          eq(profiles.username, body.username)
-        )
+        and(eq(profiles.userId, user.id), eq(profiles.username, body.username))
       );
-    
+
     if (existingProfile.length > 0) {
       return NextResponse.json(
         { error: "Profile with this username already exists" },
         { status: 400 }
       );
     }
-    
+
     // Create new profile
     const newProfile = await db
       .insert(profiles)
@@ -60,9 +69,15 @@ export async function POST(request: Request) {
         backgroundImage: body.backgroundImage,
         isPublic: body.isPublic ?? true,
         analyticsEnabled: body.analyticsEnabled ?? true,
+        layoutTemplateId: body.layoutTemplateId,
+        colorSchemeId: body.colorSchemeId,
+        customCss: body.customCss,
+        socialLinks: body.socialLinks,
+        seoTitle: body.seoTitle,
+        seoDescription: body.seoDescription,
       })
       .returning();
-    
+
     return NextResponse.json(newProfile[0]);
   } catch (error) {
     console.error("Error creating profile:", error);
@@ -77,33 +92,29 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
-    if (!body.id) {
+    const json = await request.json();
+    const parsed = ProfileUpdateSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Profile ID is required" },
+        { error: "Validation failed", issues: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
+    const body = parsed.data;
+
     // Check if profile belongs to the current user
     const existingProfile = await db
       .select()
       .from(profiles)
-      .where(
-        and(
-          eq(profiles.id, body.id),
-          eq(profiles.userId, user.id)
-        )
-      );
-    
+      .where(and(eq(profiles.id, body.id), eq(profiles.userId, user.id)));
+
     if (existingProfile.length === 0) {
       return NextResponse.json(
         { error: "Profile not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update profile
     const updatedProfile = await db
       .update(profiles)
@@ -115,11 +126,17 @@ export async function PUT(request: Request) {
         backgroundImage: body.backgroundImage,
         isPublic: body.isPublic,
         analyticsEnabled: body.analyticsEnabled,
+        layoutTemplateId: body.layoutTemplateId,
+        colorSchemeId: body.colorSchemeId,
+        customCss: body.customCss,
+        socialLinks: body.socialLinks,
+        seoTitle: body.seoTitle,
+        seoDescription: body.seoDescription,
         updatedAt: new Date(),
       })
       .where(eq(profiles.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedProfile[0]);
   } catch (error) {
     console.error("Error updating profile:", error);
@@ -136,37 +153,30 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const profileId = searchParams.get("id");
-    
+
     if (!profileId) {
       return NextResponse.json(
         { error: "Profile ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if profile belongs to the current user
     const existingProfile = await db
       .select()
       .from(profiles)
-      .where(
-        and(
-          eq(profiles.id, profileId),
-          eq(profiles.userId, user.id)
-        )
-      );
-    
+      .where(and(eq(profiles.id, profileId), eq(profiles.userId, user.id)));
+
     if (existingProfile.length === 0) {
       return NextResponse.json(
         { error: "Profile not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete profile
-    await db
-      .delete(profiles)
-      .where(eq(profiles.id, profileId));
-    
+    await db.delete(profiles).where(eq(profiles.id, profileId));
+
     return NextResponse.json({ message: "Profile deleted successfully" });
   } catch (error) {
     console.error("Error deleting profile:", error);

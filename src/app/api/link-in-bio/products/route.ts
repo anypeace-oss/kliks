@@ -3,17 +3,21 @@ import { digitalProducts, productCategories } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  ProductCreateSchema,
+  ProductUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/products - Get all products for the current user
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
+
     const userProducts = await db
       .select()
       .from(digitalProducts)
       .where(eq(digitalProducts.userId, user.id));
-    
+
     return NextResponse.json(userProducts);
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -28,8 +32,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = ProductCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     // Create new product
     const newProduct = await db
       .insert(digitalProducts)
@@ -55,7 +67,7 @@ export async function POST(request: Request) {
         seoDescription: body.seoDescription,
       })
       .returning();
-    
+
     return NextResponse.json(newProduct[0]);
   } catch (error) {
     console.error("Error creating product:", error);
@@ -70,15 +82,16 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
-    if (!body.id) {
+    const json = await request.json();
+    const parsed = ProductUpdateSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Product ID is required" },
+        { error: "Validation failed", issues: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
+    const body = parsed.data;
+
     // Check if product belongs to the current user
     const existingProduct = await db
       .select()
@@ -89,14 +102,14 @@ export async function PUT(request: Request) {
           eq(digitalProducts.userId, user.id)
         )
       );
-    
+
     if (existingProduct.length === 0) {
       return NextResponse.json(
         { error: "Product not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update product
     const updatedProduct = await db
       .update(digitalProducts)
@@ -123,7 +136,7 @@ export async function PUT(request: Request) {
       })
       .where(eq(digitalProducts.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedProduct[0]);
   } catch (error) {
     console.error("Error updating product:", error);
@@ -140,14 +153,14 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("id");
-    
+
     if (!productId) {
       return NextResponse.json(
         { error: "Product ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if product belongs to the current user
     const existingProduct = await db
       .select()
@@ -158,19 +171,17 @@ export async function DELETE(request: Request) {
           eq(digitalProducts.userId, user.id)
         )
       );
-    
+
     if (existingProduct.length === 0) {
       return NextResponse.json(
         { error: "Product not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete product
-    await db
-      .delete(digitalProducts)
-      .where(eq(digitalProducts.id, productId));
-    
+    await db.delete(digitalProducts).where(eq(digitalProducts.id, productId));
+
     return NextResponse.json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error("Error deleting product:", error);

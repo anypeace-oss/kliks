@@ -8,7 +8,7 @@ export default function LoginPage() {
     const { data: session } = authClient.useSession();
 
     if (session) {
-        redirect("/studio/dashboard");
+        redirect("/login/profile-wizard");
     }
 
     return <LoginForm />;

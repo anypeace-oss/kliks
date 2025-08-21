@@ -3,31 +3,35 @@ import { links, profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  LinkCreateSchema,
+  LinkUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/links - Get all links for the current user
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
+
     // First get all profiles for the user
     const userProfiles = await db
       .select({ id: links.profileId })
       .from(links)
       .innerJoin(profiles, eq(links.profileId, profiles.id))
       .where(eq(profiles.userId, user.id));
-    
+
     // Get all links for those profiles
-    const profileIds = userProfiles.map(profile => profile.id);
-    
+    const profileIds = userProfiles.map((profile) => profile.id);
+
     if (profileIds.length === 0) {
       return NextResponse.json([]);
     }
-    
+
     const userLinks = await db
       .select()
       .from(links)
       .where(inArray(links.profileId, profileIds)); // Get links for all profiles
-    
+
     return NextResponse.json(userLinks);
   } catch (error) {
     console.error("Error fetching links:", error);
@@ -42,26 +46,31 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = LinkCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     // Check if profile belongs to the current user
     const profile = await db
       .select()
       .from(profiles)
       .where(
-        and(
-          eq(profiles.id, body.profileId),
-          eq(profiles.userId, user.id)
-        )
+        and(eq(profiles.id, body.profileId), eq(profiles.userId, user.id))
       );
-    
+
     if (profile.length === 0) {
       return NextResponse.json(
         { error: "Profile not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Create new link
     const newLink = await db
       .insert(links)
@@ -71,14 +80,21 @@ export async function POST(request: Request) {
         url: body.url,
         description: body.description,
         linkType: body.linkType || "external",
+        productId: body.productId,
+        affiliateId: body.affiliateId,
         icon: body.icon,
         thumbnail: body.thumbnail,
+        buttonStyle: body.buttonStyle,
         isActive: body.isActive ?? true,
         openInNewTab: body.openInNewTab ?? true,
         sortOrder: body.sortOrder ?? 0,
+        scheduledStart: body.scheduledStart,
+        scheduledEnd: body.scheduledEnd,
+        clickLimit: body.clickLimit,
+        password: body.password,
       })
       .returning();
-    
+
     return NextResponse.json(newLink[0]);
   } catch (error) {
     console.error("Error creating link:", error);
@@ -93,34 +109,30 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
-    if (!body.id) {
+    const json = await request.json();
+    const parsed = LinkUpdateSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Link ID is required" },
+        { error: "Validation failed", issues: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
+    const body = parsed.data;
+
     // Check if link belongs to the current user
     const existingLink = await db
       .select()
       .from(links)
       .innerJoin(profiles, eq(links.profileId, profiles.id))
-      .where(
-        and(
-          eq(links.id, body.id),
-          eq(profiles.userId, user.id)
-        )
-      );
-    
+      .where(and(eq(links.id, body.id), eq(profiles.userId, user.id)));
+
     if (existingLink.length === 0) {
       return NextResponse.json(
         { error: "Link not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update link
     const updatedLink = await db
       .update(links)
@@ -129,16 +141,23 @@ export async function PUT(request: Request) {
         url: body.url,
         description: body.description,
         linkType: body.linkType,
+        productId: body.productId,
+        affiliateId: body.affiliateId,
         icon: body.icon,
         thumbnail: body.thumbnail,
+        buttonStyle: body.buttonStyle,
         isActive: body.isActive,
         openInNewTab: body.openInNewTab,
         sortOrder: body.sortOrder,
+        scheduledStart: body.scheduledStart,
+        scheduledEnd: body.scheduledEnd,
+        clickLimit: body.clickLimit,
+        password: body.password,
         updatedAt: new Date(),
       })
       .where(eq(links.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedLink[0]);
   } catch (error) {
     console.error("Error updating link:", error);
@@ -155,38 +174,31 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const linkId = searchParams.get("id");
-    
+
     if (!linkId) {
       return NextResponse.json(
         { error: "Link ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if link belongs to the current user
     const existingLink = await db
       .select()
       .from(links)
       .innerJoin(profiles, eq(links.profileId, profiles.id))
-      .where(
-        and(
-          eq(links.id, linkId),
-          eq(profiles.userId, user.id)
-        )
-      );
-    
+      .where(and(eq(links.id, linkId), eq(profiles.userId, user.id)));
+
     if (existingLink.length === 0) {
       return NextResponse.json(
         { error: "Link not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete link
-    await db
-      .delete(links)
-      .where(eq(links.id, linkId));
-    
+    await db.delete(links).where(eq(links.id, linkId));
+
     return NextResponse.json({ message: "Link deleted successfully" });
   } catch (error) {
     console.error("Error deleting link:", error);

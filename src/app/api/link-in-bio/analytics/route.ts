@@ -3,6 +3,7 @@ import { linkClicks, profileViews, links, profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { LinkClickCreateSchema } from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/analytics - Get analytics data for the current user
 export async function GET(request: Request) {
@@ -11,30 +12,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // link-clicks, profile-views, or all
     const limit = parseInt(searchParams.get("limit") || "100");
-    
+
     const result: any = {};
-    
+
     // Get user's profiles
     const userProfiles = await db
       .select({ id: profiles.id })
       .from(profiles)
       .where(eq(profiles.userId, user.id));
-    
-    const profileIds = userProfiles.map(profile => profile.id);
-    
+
+    const profileIds = userProfiles.map((profile) => profile.id);
+
     if (profileIds.length === 0) {
       return NextResponse.json({ linkClicks: [], profileViews: [] });
     }
-    
+
     if (type === "link-clicks" || type === "all") {
       // Get link clicks for user's links
       const userLinks = await db
         .select({ id: links.id })
         .from(links)
         .where(inArray(links.profileId, profileIds));
-      
-      const linkIds = userLinks.map(link => link.id);
-      
+
+      const linkIds = userLinks.map((link) => link.id);
+
       if (linkIds.length > 0) {
         result.linkClicks = await db
           .select()
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
         result.linkClicks = [];
       }
     }
-    
+
     if (type === "profile-views" || type === "all") {
       result.profileViews = await db
         .select()
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
         .orderBy(desc(profileViews.viewedAt))
         .limit(limit);
     }
-    
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching analytics:", error);
@@ -71,15 +72,23 @@ export async function POST(request: Request) {
   try {
     // This endpoint is for recording clicks, so we don't require authentication
     // but we validate that the link belongs to a valid profile
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = LinkClickCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     if (!body.linkId) {
       return NextResponse.json(
         { error: "Link ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Record the link click
     const newClick = await db
       .insert(linkClicks)
@@ -94,7 +103,7 @@ export async function POST(request: Request) {
         browser: body.browser,
       })
       .returning();
-    
+
     return NextResponse.json(newClick[0]);
   } catch (error) {
     console.error("Error recording link click:", error);

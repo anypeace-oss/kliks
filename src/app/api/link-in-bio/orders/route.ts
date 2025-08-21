@@ -3,17 +3,21 @@ import { orders, orderItems } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  OrderCreateSchema,
+  OrderUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/orders - Get all orders for the current user (as seller)
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
+
     const userOrders = await db
       .select()
       .from(orders)
       .where(eq(orders.sellerId, user.id));
-    
+
     return NextResponse.json(userOrders);
   } catch (error) {
     console.error("Error fetching orders:", error);
@@ -28,8 +32,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = OrderCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     // Create new order
     const newOrder = await db
       .insert(orders)
@@ -52,7 +64,7 @@ export async function POST(request: Request) {
         expiresAt: body.expiresAt,
       })
       .returning();
-    
+
     return NextResponse.json(newOrder[0]);
   } catch (error) {
     console.error("Error creating order:", error);
@@ -67,33 +79,29 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
-    if (!body.id) {
+    const json = await request.json();
+    const parsed = OrderUpdateSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Order ID is required" },
+        { error: "Validation failed", issues: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
+    const body = parsed.data;
+
     // Check if order belongs to the current user
     const existingOrder = await db
       .select()
       .from(orders)
-      .where(
-        and(
-          eq(orders.id, body.id),
-          eq(orders.sellerId, user.id)
-        )
-      );
-    
+      .where(and(eq(orders.id, body.id), eq(orders.sellerId, user.id)));
+
     if (existingOrder.length === 0) {
       return NextResponse.json(
         { error: "Order not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update order
     const updatedOrder = await db
       .update(orders)
@@ -117,7 +125,7 @@ export async function PUT(request: Request) {
       })
       .where(eq(orders.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedOrder[0]);
   } catch (error) {
     console.error("Error updating order:", error);
@@ -134,37 +142,30 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get("id");
-    
+
     if (!orderId) {
       return NextResponse.json(
         { error: "Order ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if order belongs to the current user
     const existingOrder = await db
       .select()
       .from(orders)
-      .where(
-        and(
-          eq(orders.id, orderId),
-          eq(orders.sellerId, user.id)
-        )
-      );
-    
+      .where(and(eq(orders.id, orderId), eq(orders.sellerId, user.id)));
+
     if (existingOrder.length === 0) {
       return NextResponse.json(
         { error: "Order not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete order
-    await db
-      .delete(orders)
-      .where(eq(orders.id, orderId));
-    
+    await db.delete(orders).where(eq(orders.id, orderId));
+
     return NextResponse.json({ message: "Order deleted successfully" });
   } catch (error) {
     console.error("Error deleting order:", error);

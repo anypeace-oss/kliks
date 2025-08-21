@@ -3,6 +3,10 @@ import { subscriptionPlans, userSubscriptions } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  SubscriptionCreateSchema,
+  SubscriptionUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/subscriptions - Get subscription plans and user subscriptions
 export async function GET(request: Request) {
@@ -10,27 +14,23 @@ export async function GET(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // plans, subscriptions, or all
-    
+
     const result: any = {};
-    
+
     if (type === "plans" || type === "all") {
       result.subscriptionPlans = await db
         .select()
         .from(subscriptionPlans)
         .where(eq(subscriptionPlans.isActive, true));
     }
-    
+
     if (type === "subscriptions" || type === "all") {
       result.userSubscriptions = await db
         .select()
         .from(userSubscriptions)
-        .where(
-          and(
-            eq(userSubscriptions.userId, user.id)
-          )
-        );
+        .where(and(eq(userSubscriptions.userId, user.id)));
     }
-    
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching subscription data:", error);
@@ -45,10 +45,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
+    const json = await request.json();
+    const parsed = SubscriptionCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // plan or subscription
-    
+
     if (type === "subscription") {
       // Create new user subscription
       const newSubscription = await db
@@ -63,7 +71,7 @@ export async function POST(request: Request) {
           paymentReference: body.paymentReference,
         })
         .returning();
-      
+
       return NextResponse.json(newSubscription[0]);
     } else {
       return NextResponse.json(
@@ -84,15 +92,16 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
-    if (!body.id) {
+    const json = await request.json();
+    const parsed = SubscriptionUpdateSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Subscription ID is required" },
+        { error: "Validation failed", issues: parsed.error.flatten() },
         { status: 400 }
       );
     }
-    
+    const body = parsed.data;
+
     // Check if subscription belongs to the current user
     const existingSubscription = await db
       .select()
@@ -103,14 +112,14 @@ export async function PUT(request: Request) {
           eq(userSubscriptions.userId, user.id)
         )
       );
-    
+
     if (existingSubscription.length === 0) {
       return NextResponse.json(
         { error: "Subscription not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update subscription
     const updatedSubscription = await db
       .update(userSubscriptions)
@@ -125,7 +134,7 @@ export async function PUT(request: Request) {
       })
       .where(eq(userSubscriptions.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedSubscription[0]);
   } catch (error) {
     console.error("Error updating subscription:", error);
@@ -142,14 +151,14 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const subscriptionId = searchParams.get("id");
-    
+
     if (!subscriptionId) {
       return NextResponse.json(
         { error: "Subscription ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if subscription belongs to the current user
     const existingSubscription = await db
       .select()
@@ -160,19 +169,19 @@ export async function DELETE(request: Request) {
           eq(userSubscriptions.userId, user.id)
         )
       );
-    
+
     if (existingSubscription.length === 0) {
       return NextResponse.json(
         { error: "Subscription not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete subscription
     await db
       .delete(userSubscriptions)
       .where(eq(userSubscriptions.id, subscriptionId));
-    
+
     return NextResponse.json({ message: "Subscription deleted successfully" });
   } catch (error) {
     console.error("Error deleting subscription:", error);

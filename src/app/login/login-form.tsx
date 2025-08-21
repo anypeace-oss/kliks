@@ -15,7 +15,7 @@ export default function LoginForm() {
         try {
             await authClient.signIn.social({
                 provider: "google",
-                callbackURL: "/studio/dashboard",
+                callbackURL: "/login/profile-wizard",
             });
         } finally {
             setLoadingProvider(null);
@@ -26,7 +26,7 @@ export default function LoginForm() {
         try {
             await authClient.signIn.social({
                 provider: "github",
-                callbackURL: "/studio/dashboard",
+                callbackURL: "/login/profile-wizard",
             });
         } finally {
             setLoadingProvider(null);

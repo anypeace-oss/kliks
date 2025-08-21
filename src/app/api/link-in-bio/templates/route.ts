@@ -3,6 +3,12 @@ import { layoutTemplates, colorSchemes } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  TemplateLayoutCreateSchema,
+  TemplateLayoutUpdateSchema,
+  ColorSchemeCreateSchema,
+  ColorSchemeUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/templates - Get all templates (layout templates and color schemes)
 export async function GET(request: Request) {
@@ -10,23 +16,23 @@ export async function GET(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // layout, color, or all
-    
+
     const result: any = {};
-    
+
     if (type === "layout" || type === "all") {
       result.layoutTemplates = await db
         .select()
         .from(layoutTemplates)
         .where(eq(layoutTemplates.isActive, true));
     }
-    
+
     if (type === "color" || type === "all") {
       result.colorSchemes = await db
         .select()
         .from(colorSchemes)
         .where(eq(colorSchemes.isActive, true));
     }
-    
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching templates:", error);
@@ -41,11 +47,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
+    const json = await request.json();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // layout or color
-    
+
     if (type === "layout") {
+      const parsed = TemplateLayoutCreateSchema.safeParse(json);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Validation failed", issues: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+      const body = parsed.data;
       // Create new layout template
       const newLayout = await db
         .insert(layoutTemplates)
@@ -60,9 +74,17 @@ export async function POST(request: Request) {
           sortOrder: body.sortOrder ?? 0,
         })
         .returning();
-      
+
       return NextResponse.json(newLayout[0]);
     } else if (type === "color") {
+      const parsed = ColorSchemeCreateSchema.safeParse(json);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Validation failed", issues: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+      const body = parsed.data;
       // Create new color scheme
       const newColorScheme = await db
         .insert(colorSchemes)
@@ -76,7 +98,7 @@ export async function POST(request: Request) {
           sortOrder: body.sortOrder ?? 0,
         })
         .returning();
-      
+
       return NextResponse.json(newColorScheme[0]);
     } else {
       return NextResponse.json(
@@ -97,18 +119,19 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
+    const json = await request.json();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // layout or color
-    
-    if (!body.id) {
-      return NextResponse.json(
-        { error: "Template ID is required" },
-        { status: 400 }
-      );
-    }
-    
+
     if (type === "layout") {
+      const parsed = TemplateLayoutUpdateSchema.safeParse(json);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Validation failed", issues: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+      const body = parsed.data;
       // Update layout template
       const updatedLayout = await db
         .update(layoutTemplates)
@@ -124,9 +147,17 @@ export async function PUT(request: Request) {
         })
         .where(eq(layoutTemplates.id, body.id))
         .returning();
-      
+
       return NextResponse.json(updatedLayout[0]);
     } else if (type === "color") {
+      const parsed = ColorSchemeUpdateSchema.safeParse(json);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Validation failed", issues: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+      const body = parsed.data;
       // Update color scheme
       const updatedColorScheme = await db
         .update(colorSchemes)
@@ -141,7 +172,7 @@ export async function PUT(request: Request) {
         })
         .where(eq(colorSchemes.id, body.id))
         .returning();
-      
+
       return NextResponse.json(updatedColorScheme[0]);
     } else {
       return NextResponse.json(
@@ -165,28 +196,30 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get("id");
     const type = searchParams.get("type"); // layout or color
-    
+
     if (!templateId) {
       return NextResponse.json(
         { error: "Template ID is required" },
         { status: 400 }
       );
     }
-    
+
     if (type === "layout") {
       // Delete layout template
       await db
         .delete(layoutTemplates)
         .where(eq(layoutTemplates.id, templateId));
-      
-      return NextResponse.json({ message: "Layout template deleted successfully" });
+
+      return NextResponse.json({
+        message: "Layout template deleted successfully",
+      });
     } else if (type === "color") {
       // Delete color scheme
-      await db
-        .delete(colorSchemes)
-        .where(eq(colorSchemes.id, templateId));
-      
-      return NextResponse.json({ message: "Color scheme deleted successfully" });
+      await db.delete(colorSchemes).where(eq(colorSchemes.id, templateId));
+
+      return NextResponse.json({
+        message: "Color scheme deleted successfully",
+      });
     } else {
       return NextResponse.json(
         { error: "Template type is required (layout or color)" },

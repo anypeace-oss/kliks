@@ -3,29 +3,33 @@ import { orderItems, orders } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import {
+  OrderItemCreateSchema,
+  OrderItemUpdateSchema,
+} from "@/lib/validation/link-in-bio";
 
 // GET /api/link-in-bio/order-items - Get all order items for the current user's orders
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    
+
     // First get all orders for the user
     const userOrders = await db
       .select({ id: orders.id })
       .from(orders)
       .where(eq(orders.sellerId, user.id));
-    
-    const orderIds = userOrders.map(order => order.id);
-    
+
+    const orderIds = userOrders.map((order) => order.id);
+
     if (orderIds.length === 0) {
       return NextResponse.json([]);
     }
-    
+
     const orderItemsResult = await db
       .select()
       .from(orderItems)
       .where(inArray(orderItems.orderId, orderIds));
-    
+
     return NextResponse.json(orderItemsResult);
   } catch (error) {
     console.error("Error fetching order items:", error);
@@ -40,26 +44,29 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = OrderItemCreateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     // Check if order belongs to the current user
     const order = await db
       .select()
       .from(orders)
-      .where(
-        and(
-          eq(orders.id, body.orderId),
-          eq(orders.sellerId, user.id)
-        )
-      );
-    
+      .where(and(eq(orders.id, body.orderId), eq(orders.sellerId, user.id)));
+
     if (order.length === 0) {
       return NextResponse.json(
         { error: "Order not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Create new order item
     const newOrderItem = await db
       .insert(orderItems)
@@ -74,7 +81,7 @@ export async function POST(request: Request) {
         downloadExpiresAt: body.downloadExpiresAt,
       })
       .returning();
-    
+
     return NextResponse.json(newOrderItem[0]);
   } catch (error) {
     console.error("Error creating order item:", error);
@@ -89,34 +96,37 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
-    const body = await request.json();
-    
+    const json = await request.json();
+    const parsed = OrderItemUpdateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
+
     if (!body.id) {
       return NextResponse.json(
         { error: "Order item ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if order item belongs to the current user
     const existingOrderItem = await db
       .select()
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        and(
-          eq(orderItems.id, body.id),
-          eq(orders.sellerId, user.id)
-        )
-      );
-    
+      .where(and(eq(orderItems.id, body.id), eq(orders.sellerId, user.id)));
+
     if (existingOrderItem.length === 0) {
       return NextResponse.json(
         { error: "Order item not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Update order item
     const updatedOrderItem = await db
       .update(orderItems)
@@ -132,7 +142,7 @@ export async function PUT(request: Request) {
       })
       .where(eq(orderItems.id, body.id))
       .returning();
-    
+
     return NextResponse.json(updatedOrderItem[0]);
   } catch (error) {
     console.error("Error updating order item:", error);
@@ -149,38 +159,31 @@ export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
     const orderItemId = searchParams.get("id");
-    
+
     if (!orderItemId) {
       return NextResponse.json(
         { error: "Order item ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if order item belongs to the current user
     const existingOrderItem = await db
       .select()
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
-      .where(
-        and(
-          eq(orderItems.id, orderItemId),
-          eq(orders.sellerId, user.id)
-        )
-      );
-    
+      .where(and(eq(orderItems.id, orderItemId), eq(orders.sellerId, user.id)));
+
     if (existingOrderItem.length === 0) {
       return NextResponse.json(
         { error: "Order item not found or unauthorized" },
         { status: 404 }
       );
     }
-    
+
     // Delete order item
-    await db
-      .delete(orderItems)
-      .where(eq(orderItems.id, orderItemId));
-    
+    await db.delete(orderItems).where(eq(orderItems.id, orderItemId));
+
     return NextResponse.json({ message: "Order item deleted successfully" });
   } catch (error) {
     console.error("Error deleting order item:", error);
