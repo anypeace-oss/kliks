@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { digitalProducts, productCategories } from "@/lib/schema";
+import { digitalProducts } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // plans, subscriptions, or all
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
 
     if (type === "plans" || type === "all") {
       result.subscriptionPlans = await db

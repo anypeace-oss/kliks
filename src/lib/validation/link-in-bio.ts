@@ -53,7 +53,7 @@ export const ProfileUpdateSchema = ProfileCreateSchema.extend({
   id: z.string(),
 });
 
-// ===== Links =====
+// ===== Blocks (replaces Links) =====
 const ButtonStyleSchema = z
   .object({
     backgroundColor: z.string().optional(),
@@ -64,21 +64,30 @@ const ButtonStyleSchema = z
   })
   .partial();
 
-export const LinkCreateSchema = z
+const BlockConfigSchema = z
   .object({
-    profileId: z.string(),
-    title: z.string().min(1),
-    url: OptionalUrlString,
-    description: z.string().optional(),
-    linkType: z
-      .enum(["external", "product", "affiliate"])
-      .optional()
-      .default("external"),
-    productId: z.string().optional(),
-    affiliateId: z.string().optional(),
     icon: z.string().optional(),
     thumbnail: OptionalUrlString,
     buttonStyle: ButtonStyleSchema.optional(),
+    text: z.string().optional(),
+    imageUrl: OptionalUrlString,
+    alt: z.string().optional(),
+  })
+  .partial();
+
+export const BlockCreateSchema = z
+  .object({
+    profileId: z.string(),
+    title: z.string().min(1).optional(),
+    url: OptionalUrlString,
+    description: z.string().optional(),
+    type: z
+      .enum(["link", "product", "affiliate", "text", "separator", "image"]) // generalized
+      .optional()
+      .default("link"),
+    productId: z.string().optional(),
+    affiliateId: z.string().optional(),
+    config: BlockConfigSchema.optional(),
     isActive: z.boolean().optional(),
     openInNewTab: z.boolean().optional(),
     sortOrder: z.number().int().optional(),
@@ -89,18 +98,21 @@ export const LinkCreateSchema = z
   })
   .refine(
     (data) => {
-      if (data.linkType === "external") return !!data.url;
-      if (data.linkType === "product") return !!data.productId;
-      if (data.linkType === "affiliate") return !!data.affiliateId;
+      if (data.type === "link") return !!data.url;
+      if (data.type === "product") return !!data.productId;
+      if (data.type === "affiliate") return !!data.affiliateId;
+      if (data.type === "text") return !!data.config?.text;
+      if (data.type === "image") return !!data.config?.imageUrl;
+      if (data.type === "separator") return true;
       return true;
     },
     {
       message:
-        "External requires url, product requires productId, affiliate requires affiliateId",
+        "link requires url, product requires productId, affiliate requires affiliateId, text requires config.text, image requires config.imageUrl",
     }
   );
 
-export const LinkUpdateSchema = LinkCreateSchema.extend({
+export const BlockUpdateSchema = BlockCreateSchema.extend({
   id: z.string(),
 });
 
@@ -304,8 +316,8 @@ export const LinkClickCreateSchema = z.object({
 // Re-export types for frontend usage
 export type ProfileCreateInput = z.infer<typeof ProfileCreateSchema>;
 export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
-export type LinkCreateInput = z.infer<typeof LinkCreateSchema>;
-export type LinkUpdateInput = z.infer<typeof LinkUpdateSchema>;
+export type BlockCreateInput = z.infer<typeof BlockCreateSchema>;
+export type BlockUpdateInput = z.infer<typeof BlockUpdateSchema>;
 export type ProductCreateInput = z.infer<typeof ProductCreateSchema>;
 export type ProductUpdateInput = z.infer<typeof ProductUpdateSchema>;
 export type ProductCategoryCreateInput = z.infer<

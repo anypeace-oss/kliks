@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import {
   affiliatePrograms,
   affiliates,
-  affiliateClicks,
   affiliateCommissions,
   digitalProducts,
 } from "@/lib/schema";
@@ -23,7 +22,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // programs, affiliates, clicks, commissions, or all
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
 
     if (type === "programs" || type === "all") {
       // Get affiliate programs for user's products

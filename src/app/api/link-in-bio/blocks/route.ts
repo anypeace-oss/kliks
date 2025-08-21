@@ -1,53 +1,48 @@
 import { db } from "@/lib/db";
-import { links, profiles } from "@/lib/schema";
+import { blocks, profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
-  LinkCreateSchema,
-  LinkUpdateSchema,
+  BlockCreateSchema,
+  BlockUpdateSchema,
 } from "@/lib/validation/link-in-bio";
 
-// GET /api/link-in-bio/links - Get all links for the current user
+// GET /api/link-in-bio/blocks - Get all blocks for the current user
 export async function GET() {
   try {
     const user = await getCurrentUser();
 
-    // First get all profiles for the user
     const userProfiles = await db
-      .select({ id: links.profileId })
-      .from(links)
-      .innerJoin(profiles, eq(links.profileId, profiles.id))
+      .select({ id: blocks.profileId })
+      .from(blocks)
+      .innerJoin(profiles, eq(blocks.profileId, profiles.id))
       .where(eq(profiles.userId, user.id));
 
-    // Get all links for those profiles
-    const profileIds = userProfiles.map((profile) => profile.id);
+    const profileIds = userProfiles.map((p) => p.id);
+    if (profileIds.length === 0) return NextResponse.json([]);
 
-    if (profileIds.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    const userLinks = await db
+    const userBlocks = await db
       .select()
-      .from(links)
-      .where(inArray(links.profileId, profileIds)); // Get links for all profiles
+      .from(blocks)
+      .where(inArray(blocks.profileId, profileIds));
 
-    return NextResponse.json(userLinks);
+    return NextResponse.json(userBlocks);
   } catch (error) {
-    console.error("Error fetching links:", error);
+    console.error("Error fetching blocks:", error);
     return NextResponse.json(
-      { error: "Failed to fetch links" },
+      { error: "Failed to fetch blocks" },
       { status: 500 }
     );
   }
 }
 
-// POST /api/link-in-bio/links - Create a new link for the current user
+// POST /api/link-in-bio/blocks - Create a new block
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     const json = await request.json();
-    const parsed = LinkCreateSchema.safeParse(json);
+    const parsed = BlockCreateSchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation failed", issues: parsed.error.flatten() },
@@ -56,7 +51,6 @@ export async function POST(request: Request) {
     }
     const body = parsed.data;
 
-    // Check if profile belongs to the current user
     const profile = await db
       .select()
       .from(profiles)
@@ -71,20 +65,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create new link
-    const newLink = await db
-      .insert(links)
+    const newBlock = await db
+      .insert(blocks)
       .values({
         profileId: body.profileId,
         title: body.title,
         url: body.url,
         description: body.description,
-        linkType: body.linkType || "external",
+        type: body.type || "link",
         productId: body.productId,
         affiliateId: body.affiliateId,
-        icon: body.icon,
-        thumbnail: body.thumbnail,
-        buttonStyle: body.buttonStyle,
+        config: body.config,
         isActive: body.isActive ?? true,
         openInNewTab: body.openInNewTab ?? true,
         sortOrder: body.sortOrder ?? 0,
@@ -95,22 +86,22 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    return NextResponse.json(newLink[0]);
+    return NextResponse.json(newBlock[0]);
   } catch (error) {
-    console.error("Error creating link:", error);
+    console.error("Error creating block:", error);
     return NextResponse.json(
-      { error: "Failed to create link" },
+      { error: "Failed to create block" },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/link-in-bio/links - Update a link for the current user
+// PUT /api/link-in-bio/blocks - Update a block
 export async function PUT(request: Request) {
   try {
     const user = await getCurrentUser();
     const json = await request.json();
-    const parsed = LinkUpdateSchema.safeParse(json);
+    const parsed = BlockUpdateSchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation failed", issues: parsed.error.flatten() },
@@ -119,33 +110,29 @@ export async function PUT(request: Request) {
     }
     const body = parsed.data;
 
-    // Check if link belongs to the current user
-    const existingLink = await db
+    const existing = await db
       .select()
-      .from(links)
-      .innerJoin(profiles, eq(links.profileId, profiles.id))
-      .where(and(eq(links.id, body.id), eq(profiles.userId, user.id)));
+      .from(blocks)
+      .innerJoin(profiles, eq(blocks.profileId, profiles.id))
+      .where(and(eq(blocks.id, body.id), eq(profiles.userId, user.id)));
 
-    if (existingLink.length === 0) {
+    if (existing.length === 0) {
       return NextResponse.json(
-        { error: "Link not found or unauthorized" },
+        { error: "Block not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    // Update link
-    const updatedLink = await db
-      .update(links)
+    const updated = await db
+      .update(blocks)
       .set({
         title: body.title,
         url: body.url,
         description: body.description,
-        linkType: body.linkType,
+        type: body.type,
         productId: body.productId,
         affiliateId: body.affiliateId,
-        icon: body.icon,
-        thumbnail: body.thumbnail,
-        buttonStyle: body.buttonStyle,
+        config: body.config,
         isActive: body.isActive,
         openInNewTab: body.openInNewTab,
         sortOrder: body.sortOrder,
@@ -155,55 +142,52 @@ export async function PUT(request: Request) {
         password: body.password,
         updatedAt: new Date(),
       })
-      .where(eq(links.id, body.id))
+      .where(eq(blocks.id, body.id))
       .returning();
 
-    return NextResponse.json(updatedLink[0]);
+    return NextResponse.json(updated[0]);
   } catch (error) {
-    console.error("Error updating link:", error);
+    console.error("Error updating block:", error);
     return NextResponse.json(
-      { error: "Failed to update link" },
+      { error: "Failed to update block" },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/link-in-bio/links - Delete a link for the current user
+// DELETE /api/link-in-bio/blocks - Delete a block
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
     const { searchParams } = new URL(request.url);
-    const linkId = searchParams.get("id");
+    const blockId = searchParams.get("id");
 
-    if (!linkId) {
+    if (!blockId) {
       return NextResponse.json(
-        { error: "Link ID is required" },
+        { error: "Block ID is required" },
         { status: 400 }
       );
     }
 
-    // Check if link belongs to the current user
-    const existingLink = await db
+    const existing = await db
       .select()
-      .from(links)
-      .innerJoin(profiles, eq(links.profileId, profiles.id))
-      .where(and(eq(links.id, linkId), eq(profiles.userId, user.id)));
+      .from(blocks)
+      .innerJoin(profiles, eq(blocks.profileId, profiles.id))
+      .where(and(eq(blocks.id, blockId), eq(profiles.userId, user.id)));
 
-    if (existingLink.length === 0) {
+    if (existing.length === 0) {
       return NextResponse.json(
-        { error: "Link not found or unauthorized" },
+        { error: "Block not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    // Delete link
-    await db.delete(links).where(eq(links.id, linkId));
-
-    return NextResponse.json({ message: "Link deleted successfully" });
+    await db.delete(blocks).where(eq(blocks.id, blockId));
+    return NextResponse.json({ message: "Block deleted successfully" });
   } catch (error) {
-    console.error("Error deleting link:", error);
+    console.error("Error deleting block:", error);
     return NextResponse.json(
-      { error: "Failed to delete link" },
+      { error: "Failed to delete block" },
       { status: 500 }
     );
   }

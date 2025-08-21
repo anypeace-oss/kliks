@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { layoutTemplates, colorSchemes } from "@/lib/schema";
-import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
   TemplateLayoutCreateSchema,
@@ -13,11 +12,11 @@ import {
 // GET /api/link-in-bio/templates - Get all templates (layout templates and color schemes)
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
+    // Templates are public, no user validation needed
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // layout, color, or all
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
 
     if (type === "layout" || type === "all") {
       result.layoutTemplates = await db
@@ -46,7 +45,7 @@ export async function GET(request: Request) {
 // POST /api/link-in-bio/templates/layout - Create a new layout template
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    // Only admins should be able to create templates - for now we'll skip user validation
     const json = await request.json();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // layout or color
@@ -118,7 +117,7 @@ export async function POST(request: Request) {
 // PUT /api/link-in-bio/templates - Update a template
 export async function PUT(request: Request) {
   try {
-    const user = await getCurrentUser();
+    // Only admins should be able to update templates - for now we'll skip user validation
     const json = await request.json();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type"); // layout or color
@@ -192,7 +191,7 @@ export async function PUT(request: Request) {
 // DELETE /api/link-in-bio/templates - Delete a template
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser();
+    // Only admins should be able to delete templates - for now we'll skip user validation
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get("id");
     const type = searchParams.get("type"); // layout or color

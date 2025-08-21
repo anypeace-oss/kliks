@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { linkClicks, profileViews, links, profiles } from "@/lib/schema";
+import { linkClicks, profileViews, blocks, profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { LinkClickCreateSchema } from "@/lib/validation/link-in-bio";
 
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const type = searchParams.get("type") || "all"; // link-clicks, profile-views, or all
     const limit = parseInt(searchParams.get("limit") || "100");
 
-    const result: any = {};
+    const result: Record<string, unknown> = {};
 
     // Get user's profiles
     const userProfiles = await db
@@ -28,13 +28,13 @@ export async function GET(request: Request) {
     }
 
     if (type === "link-clicks" || type === "all") {
-      // Get link clicks for user's links
-      const userLinks = await db
-        .select({ id: links.id })
-        .from(links)
-        .where(inArray(links.profileId, profileIds));
+      // Get link clicks for user's blocks
+      const userBlocks = await db
+        .select({ id: blocks.id })
+        .from(blocks)
+        .where(inArray(blocks.profileId, profileIds));
 
-      const linkIds = userLinks.map((link) => link.id);
+      const linkIds = userBlocks.map((b) => b.id);
 
       if (linkIds.length > 0) {
         result.linkClicks = await db

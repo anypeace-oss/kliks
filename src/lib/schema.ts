@@ -120,8 +120,8 @@ export const profiles = pgTable("profiles", {
     .notNull(),
 });
 
-// Links/buttons di profile
-export const links = pgTable("links", {
+// Blocks/components on the profile (replaces links)
+export const blocks = pgTable("blocks", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -129,27 +129,34 @@ export const links = pgTable("links", {
     .notNull()
     .references(() => profiles.id, { onDelete: "cascade" }),
 
-  title: text("title").notNull(),
-  url: text("url"), // nullable untuk product/affiliate links
+  // Common fields
+  title: text("title"),
+  url: text("url"), // for link/product/affiliate
   description: text("description"),
-  // Type: link biasa, produk sendiri, atau affiliate produk
-  linkType: text("link_type").notNull().default("external"), // external, product, affiliate
+  // Generalized type
+  type: text("type").notNull().default("link"), // link, product, affiliate, text, separator, image
   productId: text("product_id").references(() => digitalProducts.id, {
     onDelete: "cascade",
   }),
   affiliateId: text("affiliate_id").references(() => affiliates.id, {
     onDelete: "cascade",
   }),
-  icon: text("icon"), // icon name atau URL
-  thumbnail: text("thumbnail"), // URL gambar preview
 
-  // Styling
-  buttonStyle: jsonb("button_style").$type<{
-    backgroundColor?: string;
-    textColor?: string;
-    borderRadius?: string;
-    border?: string;
-    animation?: string;
+  // Flexible config payload
+  config: jsonb("config").$type<{
+    icon?: string;
+    thumbnail?: string;
+    buttonStyle?: {
+      backgroundColor?: string;
+      textColor?: string;
+      borderRadius?: string;
+      border?: string;
+      animation?: string;
+    };
+    text?: string;
+    imageUrl?: string;
+    alt?: string;
+    [key: string]: unknown;
   }>(),
 
   // Behavior
@@ -329,14 +336,14 @@ export const orderItems = pgTable("order_items", {
 
 // ===== ANALYTICS =====
 
-// Click analytics untuk links
+// Click analytics untuk links/blocks
 export const linkClicks = pgTable("link_clicks", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   linkId: text("link_id")
     .notNull()
-    .references(() => links.id, { onDelete: "cascade" }),
+    .references(() => blocks.id, { onDelete: "cascade" }),
 
   // Visitor info
   ipAddress: text("ip_address"),
@@ -637,9 +644,9 @@ export const profileRelations = {
     table: user,
     reference: "userId",
   },
-  links: {
+  blocks: {
     relation: "one-to-many",
-    table: links,
+    table: blocks,
     reference: "profileId",
   },
 };

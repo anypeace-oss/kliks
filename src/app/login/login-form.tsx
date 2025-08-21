@@ -145,13 +145,13 @@ export default function LoginForm() {
 
                     <p className="text-xs  text-left font-mono dark:text-foreground border-t border-dashed pt-6">
                         By signing in you agree to our{" "}
-                        <a href="/terms" className="underline">
+                        <Link href="/terms" className="underline">
                             Terms of service
-                        </a>{" "}
+                        </Link>{" "}
                         &{" "}
-                        <a href="/privacy" className="underline">
+                        <Link href="/privacy" className="underline">
                             Privacy policy
-                        </a>
+                        </Link>
                     </p>
                 </div>
             </div>

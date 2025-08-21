@@ -14,9 +14,45 @@ import type {
   ProductUpdateInput,
 } from "@/lib/validation/link-in-bio";
 
+// Type definitions for products page
+interface Product {
+  id: string;
+  categoryId: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  shortDescription: string | null;
+  thumbnail: string | null;
+  gallery: string[] | null;
+  previewFiles: string[] | null;
+  price: string | number;
+  originalPrice: string | number | null;
+  currency: string;
+  files: unknown[] | null;
+  isActive: boolean;
+  isPublic: boolean;
+  stock: number | null;
+  downloadLimit: number | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export default function ProductsStudioPage() {
-  const [items, setItems] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [items, setItems] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -41,7 +77,7 @@ export default function ProductsStudioPage() {
       downloadLimit: undefined,
       seoTitle: "",
       seoDescription: "",
-    } as any,
+    },
   });
 
   const [galleryText, setGalleryText] = useState("");
@@ -59,8 +95,22 @@ export default function ProductsStudioPage() {
       ]);
       setItems(list);
       setCategories(cats);
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to load");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to load";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -91,12 +141,12 @@ export default function ProductsStudioPage() {
       downloadLimit: undefined,
       seoTitle: "",
       seoDescription: "",
-    } as any);
+    });
     setGalleryText("");
     setPreviewText("");
   }
 
-  function onSelect(p: any) {
+  function onSelect(p: Product) {
     setSelectedId(p.id);
     form.reset({
       id: p.id,
@@ -111,19 +161,25 @@ export default function ProductsStudioPage() {
       price: p.price?.toString?.() || String(p.price || "0"),
       originalPrice: p.originalPrice?.toString?.() || "",
       currency: p.currency || "IDR",
-      files: p.files || [],
+      files:
+        (p.files as Array<{
+          name: string;
+          url: string;
+          size: number;
+          type: string;
+        }>) || [],
       isActive: p.isActive ?? true,
       isPublic: p.isPublic ?? true,
       stock: p.stock || undefined,
       downloadLimit: p.downloadLimit || undefined,
       seoTitle: p.seoTitle || "",
       seoDescription: p.seoDescription || "",
-    } as any);
+    });
     setGalleryText((p.gallery || []).join(","));
     setPreviewText((p.previewFiles || []).join(","));
   }
 
-  async function onSubmit(values: any) {
+  async function onSubmit(values: ProductCreateInput | ProductUpdateInput) {
     setLoading(true);
     setError(null);
     try {
@@ -135,7 +191,7 @@ export default function ProductsStudioPage() {
         previewFiles: previewText.trim()
           ? previewText.split(",").map((s) => s.trim())
           : [],
-      } as any;
+      };
       if (isEditing) {
         await updateProduct({
           ...(payload as ProductUpdateInput),
@@ -146,8 +202,22 @@ export default function ProductsStudioPage() {
       }
       await refresh();
       onNew();
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to save");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to save";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -160,8 +230,22 @@ export default function ProductsStudioPage() {
       await deleteProduct(id);
       await refresh();
       if (selectedId === id) onNew();
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to delete");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to delete";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

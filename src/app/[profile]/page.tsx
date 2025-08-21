@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { profiles, links as linksTable } from "@/lib/schema";
+import { profiles, blocks as blocksTable } from "@/lib/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import * as Tabler from "@tabler/icons-react";
@@ -16,6 +16,55 @@ import {
   MessageCircle,
 } from "lucide-react";
 import Image from "next/image";
+
+// Type definitions
+interface ProfileData {
+  id: string;
+  username: string;
+  displayName: string;
+  bio?: string;
+  avatar?: string;
+  backgroundImage?: string;
+  isPublic: boolean;
+  socialLinks?: Record<string, string>;
+}
+
+interface BlockData {
+  id: string;
+  profileId: string;
+  type: string;
+  title: string | null;
+  url: string | null;
+  description: string | null;
+  isActive: boolean;
+  openInNewTab: boolean | null;
+  sortOrder: number;
+  scheduledStart: Date | null;
+  scheduledEnd: Date | null;
+  productId: string | null;
+  affiliateId: string | null;
+  config: {
+    icon?: string;
+    thumbnail?: string;
+    imageUrl?: string;
+    alt?: string;
+    text?: string;
+    buttonStyle?: {
+      backgroundColor?: string;
+      textColor?: string;
+      borderRadius?: string;
+    };
+    [key: string]: unknown;
+  } | null;
+  clickLimit: number | null;
+  password: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SocialIconMap {
+  [key: string]: React.ComponentType<{ className?: string }>;
+}
 
 export default async function ProfilePage({
   params,
@@ -35,30 +84,30 @@ export default async function ProfilePage({
     notFound();
   }
 
-  const prof = profileResult[0];
+  const prof = profileResult[0] as ProfileData;
 
   // Only public profiles are visible
   if (!prof.isPublic) {
     notFound();
   }
 
-  // Fetch links for this profile (active only), sorted by sortOrder
-  const allLinks = await db
+  // Fetch blocks for this profile, sorted by sortOrder
+  const allBlocks = await db
     .select()
-    .from(linksTable)
-    .where(eq(linksTable.profileId, prof.id))
-    .orderBy(asc(linksTable.sortOrder));
+    .from(blocksTable)
+    .where(eq(blocksTable.profileId, prof.id))
+    .orderBy(asc(blocksTable.sortOrder));
 
   const now = new Date();
-  const profileLinks = allLinks.filter((l) => {
-    if (!l.isActive) return false;
-    if (l.scheduledStart && l.scheduledStart > now) return false;
-    if (l.scheduledEnd && l.scheduledEnd < now) return false;
+  const visibleBlocks = allBlocks.filter((b: BlockData) => {
+    if (!b.isActive) return false;
+    if (b.scheduledStart && b.scheduledStart > now) return false;
+    if (b.scheduledEnd && b.scheduledEnd < now) return false;
     return true;
   });
 
   const SocialIcon = (name: string) => {
-    const map: Record<string, any> = {
+    const map: SocialIconMap = {
       instagram: Instagram,
       tiktok: Music,
       youtube: Youtube,
@@ -108,7 +157,7 @@ export default async function ProfilePage({
 
         {/* Social links */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          {Object.entries((prof as any).socialLinks || {}).map(
+          {Object.entries(prof.socialLinks || {}).map(
             ([platform, url]) => (
               <a
                 key={platform}
@@ -124,39 +173,67 @@ export default async function ProfilePage({
           )}
         </div>
 
-        {/* Links */}
-        <div className="mt-6 space-y-3">
-          {profileLinks.map((link) => {
-            const TablerIcon: any = (Tabler as any)[link.icon || ""];
+        {/* Blocks */}
+        <div className="mt-6 space-y-4">
+          {visibleBlocks.map((block: BlockData) => {
+            const cfg = block.config || {};
+            if (block.type === "separator") {
+              return <hr key={block.id} className="border-gray-200" />;
+            }
+            if (block.type === "text") {
+              return (
+                <div key={block.id} className="text-gray-800">
+                  {cfg.text || block.title}
+                </div>
+              );
+            }
+            if (block.type === "image") {
+              const src = cfg.imageUrl || cfg.thumbnail;
+              if (!src) return null;
+              return (
+                <Image
+                  key={block.id}
+                  src={src}
+                  alt={cfg.alt || block.title || "image"}
+                  className="w-full rounded-lg"
+                  width={600}
+                  height={400}
+                />
+              );
+            }
+            // link/product/affiliate style button
+            const TablerIcon = cfg.icon ? (Tabler as unknown as Record<string, React.ComponentType<{ className?: string }>>)[cfg.icon] : undefined;
             const style: React.CSSProperties = {
               backgroundColor:
-                link.buttonStyle?.backgroundColor || "transparent",
-              color: (link.buttonStyle as any)?.textColor || "inherit",
-              borderRadius: (link.buttonStyle as any)?.borderRadius || "9999px",
+                cfg.buttonStyle?.backgroundColor || "transparent",
+              color: cfg.buttonStyle?.textColor || "inherit",
+              borderRadius: cfg.buttonStyle?.borderRadius || "9999px",
             };
             return (
               <a
-                key={link.id}
-                href={link.url || "#"}
-                target={link.openInNewTab ? "_blank" : "_self"}
-                rel={link.openInNewTab ? "noopener noreferrer" : undefined}
+                key={block.id}
+                href={block.url || "#"}
+                target={block.openInNewTab ? "_blank" : "_self"}
+                rel={block.openInNewTab ? "noopener noreferrer" : undefined}
                 className="block w-full rounded-full border-2 border-gray-200 hover:border-blue-600 hover:bg-blue-600 hover:text-white transition p-3 text-center"
                 style={style}
               >
                 <span className="inline-flex items-center gap-2 justify-center">
-                  {link.thumbnail && (
-                    <img
-                      src={link.thumbnail}
+                  {cfg.thumbnail && (
+                    <Image
+                      src={cfg.thumbnail}
                       alt="thumb"
                       className="w-5 h-5 rounded"
+                      width={20}
+                      height={20}
                     />
                   )}
                   {TablerIcon && <TablerIcon className="w-4 h-4" />}
-                  <span className="font-medium">{link.title}</span>
+                  <span className="font-medium">{block.title}</span>
                 </span>
-                {link.description && (
+                {block.description && (
                   <div className="text-xs opacity-80 mt-1">
-                    {link.description}
+                    {block.description}
                   </div>
                 )}
               </a>

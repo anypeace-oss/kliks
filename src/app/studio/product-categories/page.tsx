@@ -13,8 +13,20 @@ import type {
   ProductCategoryUpdateInput,
 } from "@/lib/validation/link-in-bio";
 
+// Type definition for product category
+interface ProductCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export default function ProductCategoriesStudioPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -40,8 +52,22 @@ export default function ProductCategoriesStudioPage() {
     try {
       const list = await getProductCategories();
       setItems(list);
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to load");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to load";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -63,7 +89,7 @@ export default function ProductCategoriesStudioPage() {
     });
   }
 
-  function onSelect(cat: any) {
+  function onSelect(cat: ProductCategory) {
     setSelectedId(cat.id);
     form.reset({
       id: cat.id,
@@ -73,10 +99,12 @@ export default function ProductCategoriesStudioPage() {
       icon: cat.icon || "",
       isActive: cat.isActive ?? true,
       sortOrder: cat.sortOrder ?? 0,
-    } as any);
+    });
   }
 
-  async function onSubmit(values: any) {
+  async function onSubmit(
+    values: ProductCategoryCreateInput | ProductCategoryUpdateInput
+  ) {
     setLoading(true);
     setError(null);
     try {
@@ -90,8 +118,22 @@ export default function ProductCategoriesStudioPage() {
       }
       await refresh();
       onNew();
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to save");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to save";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -104,8 +146,22 @@ export default function ProductCategoriesStudioPage() {
       await deleteProductCategory(id);
       await refresh();
       if (selectedId === id) onNew();
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to delete");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to delete";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

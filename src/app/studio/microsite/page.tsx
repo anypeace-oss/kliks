@@ -1,18 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
-  createLink,
-  deleteLink,
-  getLinks,
+  createBlock,
+  deleteBlock,
+  getBlocks,
   getProfiles,
-  updateLink,
+  updateBlock,
   updateProfile,
 } from "@/lib/api";
 import type {
-  LinkCreateInput,
-  LinkUpdateInput,
+  BlockCreateInput,
+  BlockUpdateInput,
   ProfileUpdateInput,
 } from "@/lib/validation/link-in-bio";
 
@@ -23,6 +24,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -37,10 +39,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -83,6 +83,64 @@ import {
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+// Type definitions for microsite components
+interface ProfileData {
+  id: string;
+  username: string;
+  displayName: string;
+  bio?: string;
+  avatar?: string;
+  backgroundImage?: string;
+  isPublic: boolean;
+  analyticsEnabled?: boolean;
+  layoutTemplateId?: string;
+  colorSchemeId?: string;
+  customCss?: string;
+  socialLinks?: Record<string, string>;
+  seoTitle?: string;
+  seoDescription?: string;
+}
+
+interface BlockData {
+  id: string;
+  profileId: string;
+  type: string;
+  title: string | null;
+  url: string | null;
+  description: string | null;
+  isActive: boolean;
+  openInNewTab: boolean | null;
+  sortOrder: number;
+  scheduledStart: Date | null;
+  scheduledEnd: Date | null;
+  productId: string | null;
+  affiliateId: string | null;
+  config: {
+    icon?: string;
+    thumbnail?: string;
+    imageUrl?: string;
+    alt?: string;
+    text?: string;
+    buttonStyle?: {
+      backgroundColor?: string;
+      textColor?: string;
+      borderRadius?: string;
+    };
+    separatorStyle?: string;
+    separatorHeight?: number;
+    separatorColor?: string;
+    [key: string]: unknown;
+  } | null;
+  clickLimit: number | null;
+  password: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SocialIconMap {
+  [key: string]: React.ComponentType<{ className?: string }>;
+}
+
 // --- Inline Profile Section (editable displayName, bio, avatar) + social bar ---
 function ProfileSection({
   profile,
@@ -90,8 +148,8 @@ function ProfileSection({
   onAddSocial,
   onDeleteSocial,
 }: {
-  profile: any;
-  onUpdate: (updates: Partial<any>) => void;
+  profile: ProfileData;
+  onUpdate: (updates: Partial<ProfileData>) => void;
   onAddSocial: (platform: string, value: string) => void;
   onDeleteSocial: (platform: string) => void;
 }) {
@@ -108,7 +166,7 @@ function ProfileSection({
   >;
 
   const SocialIcon = ({ name }: { name: string }) => {
-    const map: Record<string, any> = {
+    const map: SocialIconMap = {
       instagram: Instagram,
       tiktok: Music,
       youtube: Youtube,
@@ -394,7 +452,6 @@ function IconPickerDialog({
     [ICONS, query]
   );
   const [scrollTop, setScrollTop] = useState(0);
-  const visibleCount = 4 * 4; // 4 rows x 4 cols
   const itemsPerRow = 4;
   const rowHeight = ICON_SIZE + 24;
   const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
@@ -437,7 +494,12 @@ function IconPickerDialog({
                 className="grid grid-cols-4 gap-3 p-2"
               >
                 {filtered.slice(startIndex, endIndex).map((name) => {
-                  const IconComp: any = (Tabler as any)[name];
+                  const IconComp = (
+                    Tabler as unknown as Record<
+                      string,
+                      React.ComponentType<{ className?: string }>
+                    >
+                  )[name];
                   return (
                     <Button
                       key={name}
@@ -460,13 +522,15 @@ function IconPickerDialog({
 
 // --- Builder-style Link Card ---
 function BuilderLinkCard({
-  link,
+  block,
   onUpdate,
   onDelete,
+  onSave,
 }: {
-  link: any;
-  onUpdate: (updates: Partial<any>) => void;
+  block: BlockData;
+  onUpdate: (updates: Partial<BlockData>) => void;
   onDelete: () => void;
+  onSave: () => void;
 }) {
   const {
     attributes,
@@ -475,7 +539,7 @@ function BuilderLinkCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: link.id });
+  } = useSortable({ id: block.id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -490,12 +554,12 @@ function BuilderLinkCard({
   );
   const urlForm = useForm<{ url: string }>({
     resolver: zodResolver(UrlSchema),
-    defaultValues: { url: link.url || "" },
+    defaultValues: { url: block.url || "" },
     mode: "onSubmit",
   });
   useEffect(() => {
-    urlForm.reset({ url: link.url || "" });
-  }, [link.url]);
+    urlForm.reset({ url: block.url || "" });
+  }, [block.url, urlForm]);
 
   // dialogs local
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -507,27 +571,43 @@ function BuilderLinkCard({
   const [tempPassword, setTempPassword] = useState<string>("");
   const [tempThumb, setTempThumb] = useState<string>("");
 
+  // extra local for image/separator config
+  const [imageUrlDraft, setImageUrlDraft] = useState<string>("");
+  const [imageAltDraft, setImageAltDraft] = useState<string>("");
+  const [sepStyle, setSepStyle] = useState<"transparent" | "bordered">(
+    "transparent"
+  );
+  const [sepHeight, setSepHeight] = useState<number>(8);
+  const [sepColor, setSepColor] = useState<string>("#e5e7eb");
+
   useEffect(() => {
     setTempStart(
-      link.scheduledStart
-        ? new Date(link.scheduledStart).toISOString().slice(0, 16)
+      block.scheduledStart
+        ? new Date(block.scheduledStart).toISOString().slice(0, 16)
         : ""
     );
     setTempEnd(
-      link.scheduledEnd
-        ? new Date(link.scheduledEnd).toISOString().slice(0, 16)
+      block.scheduledEnd
+        ? new Date(block.scheduledEnd).toISOString().slice(0, 16)
         : ""
     );
-    setTempPassword(link.password || "");
-    setTempThumb(link.thumbnail || "");
-  }, [link]);
+    setTempPassword(block.password || "");
+    setTempThumb(block.config?.thumbnail || "");
+    setImageUrlDraft(block.config?.imageUrl || block.config?.thumbnail || "");
+    setImageAltDraft(block.config?.alt || "");
+    setSepStyle(
+      block.config?.separatorStyle === "bordered" ? "bordered" : "transparent"
+    );
+    setSepHeight(block.config?.separatorHeight || 8);
+    setSepColor(block.config?.separatorColor || "#e5e7eb");
+  }, [block]);
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={`p-4 ${isDragging ? "opacity-50" : ""} ${
-        !link.isActive ? "bg-muted/50" : ""
+        !block.isActive ? "bg-muted/50" : ""
       }`}
     >
       <div className="flex items-center gap-3">
@@ -545,7 +625,7 @@ function BuilderLinkCard({
             <div className="flex items-center gap-2 flex-1">
               {editingTitle ? (
                 <Input
-                  defaultValue={link.title}
+                  defaultValue={block.title || ""}
                   onBlur={(e) => {
                     onUpdate({ title: e.target.value });
                     setEditingTitle(false);
@@ -555,6 +635,7 @@ function BuilderLinkCard({
                       const val = (e.target as HTMLInputElement).value;
                       onUpdate({ title: val });
                       setEditingTitle(false);
+                      onSave();
                     }
                   }}
                   className="font-medium"
@@ -565,92 +646,215 @@ function BuilderLinkCard({
                   className="font-medium cursor-pointer hover:text-primary flex items-center gap-1"
                   onClick={() => setEditingTitle(true)}
                 >
-                  {link.title || "Untitled"}
+                  {block.title ||
+                    (block.type === "separator" ? "Separator" : "Untitled")}
                   <Edit2 className="w-3 h-3" />
                 </h3>
               )}
             </div>
             <div className="flex items-center gap-2">
               <Switch
-                checked={!!link.isActive}
+                checked={!!block.isActive}
                 onCheckedChange={(checked) => onUpdate({ isActive: checked })}
               />
             </div>
           </div>
 
-          {editingUrl ? (
-            <Form {...(urlForm as any)}>
+          {/* Per-type editors */}
+          {block.type === "link" && (
+            <Form {...urlForm}>
               <form
                 onSubmit={urlForm.handleSubmit((values) => {
                   onUpdate({ url: values.url.trim() });
                   setEditingUrl(false);
+                  onSave();
                 })}
               >
-                <FormField
-                  name={"url" as any}
-                  control={urlForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="https://..."
-                          onBlur={() =>
-                            urlForm.handleSubmit((v) => {
-                              onUpdate({ url: v.url.trim() });
-                              setEditingUrl(false);
-                            })()
-                          }
-                          autoFocus
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {editingUrl ? (
+                  <FormField
+                    name="url"
+                    control={urlForm.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="https://..."
+                            onBlur={() =>
+                              urlForm.handleSubmit((v) => {
+                                onUpdate({ url: v.url.trim() });
+                                setEditingUrl(false);
+                              })()
+                            }
+                            autoFocus
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <p
+                    className="text-sm text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1"
+                    onClick={() => setEditingUrl(true)}
+                  >
+                    {block.url || "URL"}
+                    <Edit2 className="w-3 h-3" />
+                  </p>
+                )}
               </form>
             </Form>
-          ) : (
-            <p
-              className="text-sm text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1"
-              onClick={() => setEditingUrl(true)}
-            >
-              {link.url || "URL"}
-              <Edit2 className="w-3 h-3" />
-            </p>
+          )}
+
+          {block.type === "text" && (
+            <Textarea
+              value={block.config?.text || ""}
+              placeholder="Write some text..."
+              onChange={(e) =>
+                onUpdate({
+                  config: { ...(block.config || {}), text: e.target.value },
+                })
+              }
+            />
+          )}
+
+          {block.type === "image" && (
+            <div className="grid gap-2">
+              <Input
+                value={imageUrlDraft}
+                placeholder="https://image.url"
+                onChange={(e) => setImageUrlDraft(e.target.value)}
+                onBlur={() =>
+                  onUpdate({
+                    config: {
+                      ...(block.config || {}),
+                      imageUrl: imageUrlDraft || undefined,
+                    },
+                  })
+                }
+              />
+              <Input
+                value={imageAltDraft}
+                placeholder="Alt text"
+                onChange={(e) => setImageAltDraft(e.target.value)}
+                onBlur={() =>
+                  onUpdate({
+                    config: {
+                      ...(block.config || {}),
+                      alt: imageAltDraft || undefined,
+                    },
+                  })
+                }
+              />
+            </div>
+          )}
+
+          {block.type === "separator" && (
+            <div className="grid grid-cols-3 gap-2 items-end">
+              <div className="col-span-3 flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sepStyle === "transparent" ? "default" : "outline"}
+                  onClick={() => {
+                    setSepStyle("transparent");
+                    onUpdate({
+                      config: {
+                        ...(block.config || {}),
+                        separatorStyle: "transparent",
+                      },
+                    });
+                  }}
+                >
+                  Transparent
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sepStyle === "bordered" ? "default" : "outline"}
+                  onClick={() => {
+                    setSepStyle("bordered");
+                    onUpdate({
+                      config: {
+                        ...(block.config || {}),
+                        separatorStyle: "bordered",
+                      },
+                    });
+                  }}
+                >
+                  Bordered
+                </Button>
+              </div>
+              <div>
+                <Label className="text-xs">Height</Label>
+                <Input
+                  type="number"
+                  value={sepHeight}
+                  onChange={(e) => {
+                    const v = Number(e.target.value || 0);
+                    setSepHeight(v);
+                    onUpdate({
+                      config: { ...(block.config || {}), separatorHeight: v },
+                    });
+                  }}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Color</Label>
+                <Input
+                  type="color"
+                  value={sepColor}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSepColor(v);
+                    onUpdate({
+                      config: { ...(block.config || {}), separatorColor: v },
+                    });
+                  }}
+                />
+              </div>
+            </div>
           )}
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-muted-foreground">
               <span className="text-xs">0 clicks</span>
-              <Button
-                size={"sm"}
-                variant={"ghost"}
-                onClick={() => setScheduleOpen(true)}
-              >
-                <Calendar className="w-4 h-4" />
-              </Button>
-              <Button
-                size={"sm"}
-                variant={"ghost"}
-                onClick={() => setPasswordOpen(true)}
-              >
-                <Lock className="w-4 h-4" />
-              </Button>
-              <Button
-                size={"sm"}
-                variant={"ghost"}
-                onClick={() => setThumbOpen(true)}
-              >
-                <ImageIcon className="w-4 h-4" />
-              </Button>
-              <Button
-                size={"sm"}
-                variant={"ghost"}
-                onClick={() => setIconOpen(true)}
-              >
-                <IconIcons className="w-4 h-4" />
-              </Button>
+              {block.type !== "separator" && (
+                <Button
+                  size={"sm"}
+                  variant={"ghost"}
+                  onClick={() => setScheduleOpen(true)}
+                >
+                  <Calendar className="w-4 h-4" />
+                </Button>
+              )}
+              {block.type !== "text" && block.type !== "separator" && (
+                <Button
+                  size={"sm"}
+                  variant={"ghost"}
+                  onClick={() => setPasswordOpen(true)}
+                >
+                  <Lock className="w-4 h-4" />
+                </Button>
+              )}
+              {block.type !== "separator" && (
+                <Button
+                  size={"sm"}
+                  variant={"ghost"}
+                  onClick={() => setThumbOpen(true)}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </Button>
+              )}
+              {block.type !== "separator" && (
+                <Button
+                  size={"sm"}
+                  variant={"ghost"}
+                  onClick={() => setIconOpen(true)}
+                >
+                  <IconIcons className="w-4 h-4" />
+                </Button>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -663,8 +867,8 @@ function BuilderLinkCard({
           </div>
         </div>
       </div>
-
-      {/* Schedule dialog */}
+      {/* dialogs remain */}
+      {/* Schedule */}
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
         <DialogContent>
           <DialogHeader>
@@ -711,7 +915,7 @@ function BuilderLinkCard({
         </DialogContent>
       </Dialog>
 
-      {/* Password dialog */}
+      {/* Password (hidden for text/separator via toolbar) */}
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
         <DialogContent>
           <DialogHeader>
@@ -723,6 +927,13 @@ function BuilderLinkCard({
               placeholder="Set a password"
               value={tempPassword}
               onChange={(e) => setTempPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onUpdate({ password: tempPassword || undefined });
+                  setPasswordOpen(false);
+                  onSave();
+                }
+              }}
             />
             <div className="flex gap-2">
               <Button
@@ -745,7 +956,7 @@ function BuilderLinkCard({
         </DialogContent>
       </Dialog>
 
-      {/* Thumbnail dialog */}
+      {/* Thumbnail */}
       <Dialog open={thumbOpen} onOpenChange={setThumbOpen}>
         <DialogContent>
           <DialogHeader>
@@ -757,11 +968,28 @@ function BuilderLinkCard({
               placeholder="https://image.url"
               value={tempThumb}
               onChange={(e) => setTempThumb(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onUpdate({
+                    config: {
+                      ...(block.config || {}),
+                      thumbnail: tempThumb || undefined,
+                    },
+                  });
+                  setThumbOpen(false);
+                  onSave();
+                }
+              }}
             />
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  onUpdate({ thumbnail: tempThumb || undefined });
+                  onUpdate({
+                    config: {
+                      ...(block.config || {}),
+                      thumbnail: tempThumb || undefined,
+                    },
+                  });
                   setThumbOpen(false);
                 }}
               >
@@ -779,12 +1007,12 @@ function BuilderLinkCard({
         </DialogContent>
       </Dialog>
 
-      {/* Icons dialog */}
+      {/* Icons */}
       <IconPickerDialog
         open={iconOpen}
         onOpenChange={setIconOpen}
         onPick={(name) => {
-          onUpdate({ icon: name });
+          onUpdate({ config: { ...(block.config || {}), icon: name } });
           setIconOpen(false);
         }}
       />
@@ -792,12 +1020,12 @@ function BuilderLinkCard({
   );
 }
 
-// Helpers for profile merge and links merge
+// Helpers for profile merge and blocks merge
 function buildProfileUpdatePayload(
-  base: any,
-  updates: Partial<any>
+  base: ProfileData,
+  updates: Partial<ProfileData>
 ): ProfileUpdateInput {
-  const nz = (v: any) => (v === null ? undefined : v);
+  const nz = (v: unknown) => (v === null ? undefined : v);
   return {
     id: nz(base.id),
     username: nz(base.username),
@@ -818,31 +1046,36 @@ function buildProfileUpdatePayload(
   } as ProfileUpdateInput;
 }
 
-function buildLinkUpdatePayload(
-  link: any,
-  updates: Partial<any>
-): LinkUpdateInput {
-  const nz = (v: any) => (v === null ? undefined : v);
+function buildBlockUpdatePayload(
+  block: BlockData,
+  updates: Partial<BlockData>
+): BlockUpdateInput {
+  const nz = (v: unknown) => (v === null ? undefined : v);
+  // Merge config if provided in updates
+  const mergedConfig = updates.config
+    ? {
+        ...(block.config || {}),
+        ...(updates.config as Record<string, unknown>),
+      }
+    : block.config;
   return {
-    id: link.id,
-    profileId: nz(link.profileId),
-    title: nz(updates.title ?? link.title),
-    url: nz(updates.url ?? link.url),
-    description: nz(updates.description ?? link.description),
-    linkType: nz(updates.linkType ?? link.linkType ?? "external"),
-    productId: nz(updates.productId ?? link.productId),
-    affiliateId: nz(updates.affiliateId ?? link.affiliateId),
-    icon: nz(updates.icon ?? link.icon),
-    thumbnail: nz(updates.thumbnail ?? link.thumbnail),
-    isActive: nz(updates.isActive ?? link.isActive),
-    openInNewTab: nz(updates.openInNewTab ?? link.openInNewTab),
-    sortOrder: nz(updates.sortOrder ?? link.sortOrder),
-    scheduledStart: nz(updates.scheduledStart ?? link.scheduledStart),
-    scheduledEnd: nz(updates.scheduledEnd ?? link.scheduledEnd),
-    clickLimit: nz(updates.clickLimit ?? link.clickLimit),
-    password: nz(updates.password ?? link.password),
-    buttonStyle: nz(updates.buttonStyle ?? link.buttonStyle),
-  } as LinkUpdateInput;
+    id: block.id,
+    profileId: nz(block.profileId),
+    title: nz(updates.title ?? block.title),
+    url: nz(updates.url ?? block.url),
+    description: nz(updates.description ?? block.description),
+    type: nz(updates.type ?? block.type ?? "link"),
+    productId: nz(updates.productId ?? block.productId),
+    affiliateId: nz(updates.affiliateId ?? block.affiliateId),
+    config: nz(mergedConfig),
+    isActive: nz(updates.isActive ?? block.isActive),
+    openInNewTab: nz(updates.openInNewTab ?? block.openInNewTab),
+    sortOrder: nz(updates.sortOrder ?? block.sortOrder),
+    scheduledStart: nz(updates.scheduledStart ?? block.scheduledStart),
+    scheduledEnd: nz(updates.scheduledEnd ?? block.scheduledEnd),
+    clickLimit: nz(updates.clickLimit ?? block.clickLimit),
+    password: nz(updates.password ?? block.password),
+  } as BlockUpdateInput;
 }
 
 export default function MicrositeStudioPage() {
@@ -856,7 +1089,7 @@ export default function MicrositeStudioPage() {
   const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
     queryKey: ["profiles"],
     queryFn: getProfiles,
-  });
+  }) as { data: ProfileData[]; isLoading: boolean };
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     null
   );
@@ -865,20 +1098,22 @@ export default function MicrositeStudioPage() {
       setSelectedProfileId(profiles[0].id);
   }, [profiles, selectedProfileId]);
 
-  const { data: allLinks = [], isLoading: loadingLinks } = useQuery({
-    queryKey: ["links"],
-    queryFn: getLinks,
+  const { data: allBlocks = [], isLoading: loadingBlocks } = useQuery({
+    queryKey: ["blocks"],
+    queryFn: getBlocks,
   });
-  const links = useMemo(
+  const blocks = useMemo(
     () =>
       selectedProfileId
-        ? allLinks.filter((l: any) => l.profileId === selectedProfileId)
+        ? (allBlocks as BlockData[]).filter(
+            (b: BlockData) => b.profileId === selectedProfileId
+          )
         : [],
-    [allLinks, selectedProfileId]
+    [allBlocks, selectedProfileId]
   );
 
   const currentProfile = useMemo(
-    () => profiles.find((p: any) => p.id === selectedProfileId) || profiles[0],
+    () => profiles.find((p) => p.id === selectedProfileId) || profiles[0],
     [profiles, selectedProfileId]
   );
 
@@ -888,7 +1123,7 @@ export default function MicrositeStudioPage() {
     onMutate: async (payload) => {
       await queryClient.cancelQueries({ queryKey: ["profiles"] });
       const previous = queryClient.getQueryData(["profiles"]) as
-        | any[]
+        | ProfileData[]
         | undefined;
       if (previous && payload?.id) {
         const next = previous.map((p) =>
@@ -904,114 +1139,212 @@ export default function MicrositeStudioPage() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["profiles"] }),
   });
 
-  const mutateLink = useMutation({
-    mutationFn: (payload: LinkUpdateInput) => updateLink(payload),
+  const mutateBlock = useMutation({
+    mutationFn: (payload: BlockUpdateInput) => updateBlock(payload),
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["links"] });
-      const previous = queryClient.getQueryData(["links"]) as any[] | undefined;
+      await queryClient.cancelQueries({ queryKey: ["blocks"] });
+      const previous = queryClient.getQueryData(["blocks"]) as
+        | BlockData[]
+        | undefined;
       if (previous && payload?.id) {
-        const next = previous.map((l) =>
-          l.id === payload.id ? { ...l, ...payload } : l
+        const next = previous.map((b) =>
+          b.id === payload.id ? { ...b, ...payload } : b
         );
-        queryClient.setQueryData(["links"], next);
+        queryClient.setQueryData(["blocks"], next);
       }
       return { previous };
     },
     onError: (_err, _payload, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["links"], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["links"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
 
-  const mutateCreateLink = useMutation({
-    mutationFn: (payload: LinkCreateInput) => createLink(payload),
+  const mutateCreateBlock = useMutation({
+    mutationFn: (payload: BlockCreateInput) => createBlock(payload),
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["links"] });
-      const previous = queryClient.getQueryData(["links"]) as any[] | undefined;
+      await queryClient.cancelQueries({ queryKey: ["blocks"] });
+      const previous = queryClient.getQueryData(["blocks"]) as
+        | BlockData[]
+        | undefined;
       if (previous) {
-        const temp = { ...payload, id: `temp-${Date.now()}` } as any;
-        queryClient.setQueryData(["links"], [...previous, temp]);
+        const temp = { ...payload, id: `temp-${Date.now()}` } as BlockData;
+        queryClient.setQueryData(["blocks"], [...previous, temp]);
       }
       return { previous };
     },
     onError: (_err, _payload, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["links"], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["links"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
 
-  const mutateDeleteLink = useMutation({
-    mutationFn: (id: string) => deleteLink(id),
+  const mutateDeleteBlock = useMutation({
+    mutationFn: (id: string) => deleteBlock(id),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["links"] });
-      const previous = queryClient.getQueryData(["links"]) as any[] | undefined;
+      await queryClient.cancelQueries({ queryKey: ["blocks"] });
+      const previous = queryClient.getQueryData(["blocks"]) as
+        | BlockData[]
+        | undefined;
       if (previous)
         queryClient.setQueryData(
-          ["links"],
-          previous.filter((l) => l.id !== id)
+          ["blocks"],
+          previous.filter((b) => b.id !== id)
         );
       return { previous };
     },
     onError: (_err, _id, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["links"], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["links"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
+
+  // Pending updates queue to avoid too many posts
+  const [pendingBlockUpdates, setPendingBlockUpdates] = useState<
+    Record<string, Partial<BlockData>>
+  >({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  function applyBlockUpdateLocal(
+    block: BlockData,
+    updates: Partial<BlockData>
+  ) {
+    // update local cache for instant UX
+    queryClient.setQueryData(["blocks"], (prev: BlockData[] | undefined) => {
+      if (!prev) return prev;
+      return prev.map((b) =>
+        b.id === block.id
+          ? {
+              ...b,
+              ...updates,
+              config: updates.config
+                ? {
+                    ...(b.config || {}),
+                    ...(updates.config as Record<string, unknown>),
+                  }
+                : b.config,
+            }
+          : b
+      );
+    });
+    // queue pending
+    setPendingBlockUpdates((prev) => ({
+      ...prev,
+      [block.id]: {
+        ...(prev[block.id] || {}),
+        ...updates,
+        config: updates.config
+          ? {
+              ...(prev[block.id]?.config || {}),
+              ...(updates.config as Record<string, unknown>),
+            }
+          : (prev[block.id]?.config as Record<string, unknown>),
+      },
+    }));
+  }
+
+  async function saveOneBlock(blockId: string) {
+    const pending = pendingBlockUpdates[blockId];
+    if (!pending) return;
+    const current = (
+      queryClient.getQueryData(["blocks"]) as BlockData[] | undefined
+    )?.find((b) => b.id === blockId);
+    if (!current) return;
+    const payload = buildBlockUpdatePayload(current, pending);
+    if (payload.type === "product" || payload.type === "affiliate")
+      payload.url = undefined;
+    await mutateBlock.mutateAsync(payload);
+    setPendingBlockUpdates((prev) => {
+      const next = { ...prev };
+      delete next[blockId];
+      return next;
+    });
+  }
+
+  async function saveAllPending() {
+    const ids = Object.keys(pendingBlockUpdates);
+    if (!ids.length) return;
+    setIsSaving(true);
+    for (const id of ids) {
+      await saveOneBlock(id);
+    }
+    setIsSaving(false);
+  }
 
   // DnD
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   useEffect(() => {
-    setOrderedIds(
-      [...links]
-        .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-        .map((l: any) => l.id)
-    );
-  }, [links]);
+    const nextIds = [...blocks]
+      .sort(
+        (a: BlockData, b: BlockData) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      )
+      .map((l: BlockData) => l.id);
+    setOrderedIds((prev) => {
+      if (
+        prev.length === nextIds.length &&
+        prev.every((id, i) => id === nextIds[i])
+      ) {
+        return prev;
+      }
+      return nextIds;
+    });
+  }, [blocks]);
 
-  async function onDragEnd(event: any) {
+  async function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setOrderedIds((ids) => {
-      const oldIndex = ids.indexOf(active.id);
-      const newIndex = ids.indexOf(over.id);
+      const oldIndex = ids.indexOf(String(active.id));
+      const newIndex = ids.indexOf(String(over.id));
       const next = arrayMove(ids, oldIndex, newIndex);
-      // persist order immediately
+      // update local order and queue pending
       next.forEach((id, idx) => {
-        const link = links.find((l: any) => l.id === id);
-        if (link && link.sortOrder !== idx) {
-          const payload = buildLinkUpdatePayload(link, { sortOrder: idx });
-          if (
-            payload.linkType === "product" ||
-            payload.linkType === "affiliate"
-          )
-            payload.url = undefined;
-          mutateLink.mutate(payload);
+        const block = blocks.find((l: BlockData) => l.id === id);
+        if (block && block.sortOrder !== idx) {
+          applyBlockUpdateLocal(block, { sortOrder: idx });
         }
       });
       return next;
     });
   }
 
-  // Add link dialog with shadcn form wrappers
-  const addForm = useForm<LinkCreateInput>({
+  // Add block dialog with type selector
+  const addForm = useForm<{
+    type: "link" | "text" | "separator" | "image";
+    title?: string;
+    url?: string;
+    text?: string;
+    imageUrl?: string;
+    alt?: string;
+  }>({
     resolver: zodResolver(
-      z.object({
-        title: z.string().min(1),
-        url: z.string().url("URL must include http:// or https://"),
-      })
+      z
+        .object({
+          type: z.enum(["link", "text", "separator", "image"]),
+          title: z.string().optional(),
+          url: z
+            .string()
+            .url("URL must include http:// or https://")
+            .optional(),
+          text: z.string().optional(),
+          imageUrl: z.string().url("Must be a valid URL").optional(),
+          alt: z.string().optional(),
+        })
+        .refine(
+          (v) => {
+            if (v.type === "link") return !!v.title && !!v.url;
+            if (v.type === "text") return !!v.text;
+            if (v.type === "image") return !!v.imageUrl;
+            return true; // separator
+          },
+          { message: "Fill required fields for selected block type" }
+        )
     ),
-    defaultValues: {
-      profileId: "",
-      title: "",
-      url: "",
-      linkType: "external",
-      isActive: true,
-      openInNewTab: true,
-      sortOrder: 0,
-    } as any,
+    defaultValues: { type: "link" },
   });
+
   const [addOpen, setAddOpen] = useState(false);
-  const isLoading = loadingProfiles || loadingLinks;
+  const isLoading = loadingProfiles || loadingBlocks;
   const publicUrl = currentProfile?.username
     ? `http://localhost:3000/${currentProfile.username}`
     : "#";
@@ -1073,75 +1406,216 @@ export default function MicrositeStudioPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Links</CardTitle>
+              <CardTitle>Blocks</CardTitle>
               <div className="flex items-center gap-2">
                 <Dialog open={addOpen} onOpenChange={setAddOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline">Add Link</Button>
+                    <Button variant="outline">Add Block</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Add Link</DialogTitle>
+                      <DialogTitle>Add Block</DialogTitle>
                     </DialogHeader>
-                    <Form {...(addForm as any)}>
+                    <Form {...addForm}>
                       <form
                         onSubmit={addForm.handleSubmit(async (values) => {
                           if (!selectedProfileId) return;
-                          const payload: LinkCreateInput = {
-                            ...values,
+                          const base = {
                             profileId: selectedProfileId,
-                            linkType: values.linkType || "external",
-                          } as any;
-                          // simple client-side rule
-                          if (payload.linkType === "external" && !payload.url)
-                            return;
-                          await mutateCreateLink.mutateAsync(payload);
-                          addForm.reset({
-                            profileId: selectedProfileId,
-                            title: "",
-                            url: "",
-                            linkType: "external",
-                            isActive: true,
-                            openInNewTab: true,
-                            sortOrder: links.length,
-                          } as any);
+                            sortOrder: blocks.length,
+                          };
+                          let payload: BlockCreateInput;
+                          if (values.type === "link") {
+                            payload = {
+                              ...base,
+                              type: "link",
+                              title: values.title!,
+                              url: values.url!,
+                              isActive: true,
+                              openInNewTab: true,
+                            };
+                          } else if (values.type === "text") {
+                            payload = {
+                              ...base,
+                              type: "text",
+                              title: values.title,
+                              url: undefined,
+                              config: { text: values.text },
+                            };
+                          } else if (values.type === "image") {
+                            payload = {
+                              ...base,
+                              type: "image",
+                              title: values.title,
+                              url: undefined,
+                              config: {
+                                imageUrl: values.imageUrl,
+                                alt: values.alt,
+                              },
+                            };
+                          } else {
+                            payload = {
+                              ...base,
+                              type: "separator",
+                              url: undefined,
+                            };
+                          }
+                          await mutateCreateBlock.mutateAsync(payload);
+                          addForm.reset({ type: "link" });
                           setAddOpen(false);
                         })}
                         className="grid grid-cols-2 gap-3"
                       >
+                        {/* Type selector */}
                         <FormField
-                          name={"title" as any}
+                          name="type"
                           control={addForm.control}
                           render={({ field }) => (
                             <FormItem className="col-span-2">
-                              <FormLabel>Title</FormLabel>
-                              <FormControl>
-                                <Input {...field} required />
-                              </FormControl>
-                              <FormMessage />
+                              <FormLabel>Type</FormLabel>
+                              <div className="flex gap-2">
+                                {(
+                                  [
+                                    "link",
+                                    "text",
+                                    "separator",
+                                    "image",
+                                  ] as const
+                                ).map((t) => (
+                                  <Button
+                                    key={t}
+                                    type="button"
+                                    variant={
+                                      field.value === t ? "default" : "outline"
+                                    }
+                                    onClick={() => addForm.setValue("type", t)}
+                                  >
+                                    {t}
+                                  </Button>
+                                ))}
+                              </div>
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          name={"url" as any}
-                          control={addForm.control}
-                          render={({ field }) => (
-                            <FormItem className="col-span-2">
-                              <FormLabel>URL</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="https://..." />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+
+                        {/* Conditional fields */}
+                        {addForm.watch("type") === "link" && (
+                          <>
+                            <FormField
+                              name="title"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Title</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} required />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              name="url"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>URL</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="https://..."
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+
+                        {addForm.watch("type") === "text" && (
+                          <>
+                            <FormField
+                              name="title"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Title (optional)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              name="text"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Text</FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      {...field}
+                                      placeholder="Your text..."
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+
+                        {addForm.watch("type") === "image" && (
+                          <>
+                            <FormField
+                              name="title"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Title (optional)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              name="imageUrl"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Image URL</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder="https://..."
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              name="alt"
+                              control={addForm.control}
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Alt text (optional)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                        )}
+
                         <div className="col-span-2 flex items-center gap-2">
-                          <Button
-                            type="submit"
-                            disabled={!addForm.watch("title")?.trim()}
-                          >
-                            Create
-                          </Button>
+                          <Button type="submit">Create</Button>
                           <Button
                             type="button"
                             variant="outline"
@@ -1169,22 +1643,17 @@ export default function MicrositeStudioPage() {
                 >
                   <div className="space-y-2">
                     {orderedIds.map((id) => {
-                      const l = links.find((x: any) => x.id === id);
-                      if (!l) return null;
+                      const b = blocks.find((x: BlockData) => x.id === id);
+                      if (!b) return null;
                       return (
                         <BuilderLinkCard
-                          key={l.id}
-                          link={l}
-                          onUpdate={(updates) => {
-                            const payload = buildLinkUpdatePayload(l, updates);
-                            if (
-                              payload.linkType === "product" ||
-                              payload.linkType === "affiliate"
-                            )
-                              payload.url = undefined;
-                            mutateLink.mutate(payload);
-                          }}
-                          onDelete={() => mutateDeleteLink.mutate(l.id)}
+                          key={b.id}
+                          block={b}
+                          onUpdate={(updates) =>
+                            applyBlockUpdateLocal(b, updates)
+                          }
+                          onDelete={() => mutateDeleteBlock.mutate(b.id)}
+                          onSave={() => saveOneBlock(b.id)}
                         />
                       );
                     })}
@@ -1193,8 +1662,19 @@ export default function MicrositeStudioPage() {
               </DndContext>
             </CardContent>
           </Card>
+
+          {/* Sticky Save Bar */}
+          <div className="sticky bottom-0 z-40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t mt-4 p-3 flex justify-end">
+            <Button
+              onClick={saveAllPending}
+              disabled={isSaving || !Object.keys(pendingBlockUpdates).length}
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
         </div>
 
+        {/* Preview column unchanged except rendering blocks */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
@@ -1239,8 +1719,8 @@ export default function MicrositeStudioPage() {
                           <div className="flex justify-center gap-2 pt-2">
                             {Object.entries(
                               currentProfile?.socialLinks || {}
-                            ).map(([platform, url]: any) => {
-                              const map: Record<string, any> = {
+                            ).map(([platform, url]: [string, string]) => {
+                              const map: SocialIconMap = {
                                 instagram: Instagram,
                                 tiktok: Music,
                                 youtube: Youtube,
@@ -1274,56 +1754,97 @@ export default function MicrositeStudioPage() {
                           </div>
                         </div>
                         <div className="space-y-3">
-                          {[...links]
-                            .filter((l: any) => l.isActive)
+                          {[...blocks]
+                            .filter((l: BlockData) => l.isActive)
                             .sort(
-                              (a: any, b: any) =>
+                              (a: BlockData, b: BlockData) =>
                                 (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
                             )
-                            .map((link: any) => {
-                              const TablerIcon: any = (Tabler as any)[
-                                link.icon || ""
-                              ];
+                            .map((block: BlockData) => {
+                              const cfg = block.config || {};
+                              if (block.type === "separator") {
+                                return (
+                                  <hr
+                                    key={block.id}
+                                    className="border-gray-200"
+                                  />
+                                );
+                              }
+                              if (block.type === "text") {
+                                return (
+                                  <div
+                                    key={block.id}
+                                    className="text-sm text-foreground"
+                                  >
+                                    {cfg.text || block.title}
+                                  </div>
+                                );
+                              }
+                              if (block.type === "image") {
+                                const src = cfg.imageUrl || cfg.thumbnail;
+                                if (!src) return null;
+                                return (
+                                  <Image
+                                    key={block.id}
+                                    src={src}
+                                    alt={cfg.alt || block.title || "image"}
+                                    className="w-full rounded-lg"
+                                    width={240}
+                                    height={160}
+                                  />
+                                );
+                              }
+                              const TablerIcon = cfg.icon
+                                ? (
+                                    Tabler as unknown as Record<
+                                      string,
+                                      React.ComponentType<{
+                                        className?: string;
+                                      }>
+                                    >
+                                  )[cfg.icon]
+                                : undefined;
                               return (
                                 <Button
-                                  key={link.id}
+                                  key={block.id}
                                   asChild
                                   variant="outline"
                                   className="w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary bg-transparent flex items-center gap-2 justify-center"
                                   style={{
                                     backgroundColor:
-                                      link.buttonStyle?.backgroundColor ||
+                                      cfg.buttonStyle?.backgroundColor ||
                                       "transparent",
                                     color:
-                                      link.buttonStyle?.textColor || "inherit",
+                                      cfg.buttonStyle?.textColor || "inherit",
                                     borderRadius:
-                                      link.buttonStyle?.borderRadius ||
-                                      "9999px",
+                                      cfg.buttonStyle?.borderRadius || "9999px",
                                   }}
                                 >
                                   <a
-                                    href={link.url || "#"}
+                                    href={block.url || "#"}
                                     target={
-                                      link.openInNewTab ? "_blank" : "_self"
+                                      block.openInNewTab ? "_blank" : "_self"
                                     }
                                     rel={
-                                      link.openInNewTab
+                                      block.openInNewTab
                                         ? "noopener noreferrer"
                                         : undefined
                                     }
                                   >
                                     <span className="inline-flex items-center gap-2">
-                                      {link.thumbnail && (
-                                        <img
-                                          src={link.thumbnail}
+                                      {cfg.thumbnail && (
+                                        <Image
+                                          src={cfg.thumbnail}
                                           alt="thumb"
                                           className="w-5 h-5 rounded"
+                                          width={20}
+                                          height={20}
                                         />
                                       )}
                                       {TablerIcon && (
                                         <TablerIcon className="w-4 h-4" />
                                       )}
-                                      {link.title}
+                                      {block.title}
                                     </span>
                                   </a>
                                 </Button>

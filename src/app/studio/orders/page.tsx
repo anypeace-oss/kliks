@@ -34,10 +34,53 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Type definitions for orders page
+interface Order {
+  id: string;
+  orderNumber: string;
+  customerId: string | null;
+  customerEmail: string;
+  customerName: string;
+  customerPhone: string | null;
+  affiliateId: string | null;
+  sellerId: string;
+  subtotal: string | number;
+  tax: string | number;
+  total: string | number;
+  currency: string;
+  status: string;
+  paymentMethod: string | null;
+  paymentReference: string | null;
+  paidAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  productPrice: string | number;
+  quantity: number;
+  downloadCount: number;
+  downloadLimit: number;
+  downloadExpiresAt: string | null;
+  createdAt: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: string | number;
+  [key: string]: unknown;
+}
+
 export default function OrdersAndItemsStudioPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [orderItems, setOrderItems] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrderItemId, setSelectedOrderItemId] = useState<string | null>(
     null
@@ -62,7 +105,7 @@ export default function OrdersAndItemsStudioPage() {
       paymentReference: "",
       paidAt: undefined,
       expiresAt: undefined,
-    } as any,
+    },
   });
   const orderEditing = useMemo(() => !!selectedOrderId, [selectedOrderId]);
 
@@ -76,7 +119,7 @@ export default function OrdersAndItemsStudioPage() {
       downloadCount: 0,
       downloadLimit: 5,
       downloadExpiresAt: undefined,
-    } as any,
+    },
   });
   const itemEditing = useMemo(
     () => !!selectedOrderItemId,
@@ -96,8 +139,22 @@ export default function OrdersAndItemsStudioPage() {
       setOrderItems(its);
       setProducts(ps);
       if (os.length && !selectedOrderId) setSelectedOrderId(os[0].id);
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to load");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to load";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -127,10 +184,10 @@ export default function OrdersAndItemsStudioPage() {
       paymentReference: "",
       paidAt: undefined,
       expiresAt: undefined,
-    } as any);
+    });
   }
 
-  function onPickOrder(o: any) {
+  function onPickOrder(o: Order) {
     setSelectedOrderId(o.id);
     orderForm.reset({
       id: o.id,
@@ -144,15 +201,21 @@ export default function OrdersAndItemsStudioPage() {
       tax: o.tax?.toString?.() || "0",
       total: o.total?.toString?.() || String(o.total || "0"),
       currency: o.currency || "IDR",
-      status: o.status || "pending",
+      status:
+        o.status === "pending" ||
+        o.status === "paid" ||
+        o.status === "failed" ||
+        o.status === "refunded"
+          ? o.status
+          : "pending",
       paymentMethod: o.paymentMethod || "",
       paymentReference: o.paymentReference || "",
-      paidAt: o.paidAt || undefined,
-      expiresAt: o.expiresAt || undefined,
-    } as any);
+      paidAt: o.paidAt ? new Date(o.paidAt) : undefined,
+      expiresAt: o.expiresAt ? new Date(o.expiresAt) : undefined,
+    });
   }
 
-  async function onSubmitOrder(values: any) {
+  async function onSubmitOrder(values: OrderCreateInput | OrderUpdateInput) {
     setLoading(true);
     setError(null);
     try {
@@ -166,10 +229,22 @@ export default function OrdersAndItemsStudioPage() {
       }
       await refresh();
       onNewOrder();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.error || e?.message || "Failed to save order"
-      );
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to save order";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -182,10 +257,22 @@ export default function OrdersAndItemsStudioPage() {
       await deleteOrder(id);
       await refresh();
       if (selectedOrderId === id) onNewOrder();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.error || e?.message || "Failed to delete order"
-      );
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to delete order";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -203,10 +290,10 @@ export default function OrdersAndItemsStudioPage() {
       downloadCount: 0,
       downloadLimit: 5,
       downloadExpiresAt: undefined,
-    } as any);
+    });
   }
 
-  function onPickItem(it: any) {
+  function onPickItem(it: OrderItem) {
     setSelectedOrderItemId(it.id);
     itemForm.reset({
       id: it.id,
@@ -218,22 +305,26 @@ export default function OrdersAndItemsStudioPage() {
       quantity: it.quantity ?? 1,
       downloadCount: it.downloadCount ?? 0,
       downloadLimit: it.downloadLimit ?? 5,
-      downloadExpiresAt: it.downloadExpiresAt || undefined,
-    } as any);
+      downloadExpiresAt: it.downloadExpiresAt
+        ? new Date(it.downloadExpiresAt)
+        : undefined,
+    });
   }
 
   function fillFromProduct(pid: string) {
     const p = products.find((x) => x.id === pid);
     if (p) {
-      itemForm.setValue("productName" as any, p.name || "");
+      itemForm.setValue("productName", p.name || "");
       itemForm.setValue(
-        "productPrice" as any,
+        "productPrice",
         p.price?.toString?.() || String(p.price || "0")
       );
     }
   }
 
-  async function onSubmitItem(values: any) {
+  async function onSubmitItem(
+    values: OrderItemCreateInput | OrderItemUpdateInput
+  ) {
     setLoading(true);
     setError(null);
     try {
@@ -247,8 +338,22 @@ export default function OrdersAndItemsStudioPage() {
       }
       await refresh();
       onNewItem();
-    } catch (e: any) {
-      setError(e?.response?.data?.error || e?.message || "Failed to save item");
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to save item";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -261,10 +366,22 @@ export default function OrdersAndItemsStudioPage() {
       await deleteOrderItem(id);
       await refresh();
       if (selectedOrderItemId === id) onNewItem();
-    } catch (e: any) {
-      setError(
-        e?.response?.data?.error || e?.message || "Failed to delete item"
-      );
+    } catch (e: unknown) {
+      const errorMessage =
+        e instanceof Error &&
+        "response" in e &&
+        typeof e.response === "object" &&
+        e.response &&
+        "data" in e.response &&
+        typeof e.response.data === "object" &&
+        e.response.data &&
+        "error" in e.response.data &&
+        typeof e.response.data.error === "string"
+          ? e.response.data.error
+          : e instanceof Error
+          ? e.message
+          : "Failed to delete item";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -407,7 +524,10 @@ export default function OrdersAndItemsStudioPage() {
                     <Select
                       value={orderForm.watch("status") || "pending"}
                       onValueChange={(v) =>
-                        orderForm.setValue("status" as any, v)
+                        orderForm.setValue(
+                          "status",
+                          v as "pending" | "paid" | "failed" | "refunded"
+                        )
                       }
                     >
                       <SelectTrigger>
@@ -530,9 +650,7 @@ export default function OrdersAndItemsStudioPage() {
                     <Label>Order</Label>
                     <Select
                       value={itemForm.watch("orderId") || selectedOrderId || ""}
-                      onValueChange={(v) =>
-                        itemForm.setValue("orderId" as any, v)
-                      }
+                      onValueChange={(v) => itemForm.setValue("orderId", v)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select order" />
@@ -553,7 +671,7 @@ export default function OrdersAndItemsStudioPage() {
                     <Select
                       value={itemForm.watch("productId") || ""}
                       onValueChange={(v) => {
-                        itemForm.setValue("productId" as any, v);
+                        itemForm.setValue("productId", v);
                         fillFromProduct(v);
                       }}
                     >

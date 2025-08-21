@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,9 +70,17 @@ export default function ProfileWizard() {
         // Redirect to the user's new profile
         router.push(`/${username}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating profile:", err);
-      setError(err.response?.data?.error || "Failed to create profile");
+      const errorMessage = err instanceof Error && 'response' in err && 
+        typeof err.response === 'object' && err.response && 
+        'data' in err.response && 
+        typeof err.response.data === 'object' && err.response.data &&
+        'error' in err.response.data &&
+        typeof err.response.data.error === 'string'
+        ? err.response.data.error
+        : "Failed to create profile";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -148,10 +157,12 @@ export default function ProfileWizard() {
             />
             {avatar && (
               <div className="mt-2">
-                <img
+                <Image
                   src={avatar}
                   alt="Avatar preview"
                   className="w-16 h-16 rounded-full object-cover"
+                  width={64}
+                  height={64}
                 />
               </div>
             )}

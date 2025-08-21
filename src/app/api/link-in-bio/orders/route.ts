@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { orders, orderItems } from "@/lib/schema";
+import { orders } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
