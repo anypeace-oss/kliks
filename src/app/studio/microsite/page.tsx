@@ -69,7 +69,6 @@ import {
   Save,
   Copy,
   Settings,
-  ExternalLink,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -297,6 +296,7 @@ function ProfileSection({
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (error) {
       toast.error("Failed to copy link");
+      throw error;
     }
   };
 
@@ -677,7 +677,7 @@ function ProfileSection({
           {/* Confirmation Field */}
           {usernameAvailable && newUsername.trim() !== profile?.username && (
             <div>
-              <Label htmlFor="confirmation">Type "YAKIN" to confirm</Label>
+              <Label htmlFor="confirmation">Type &quot;YAKIN&quot; to confirm</Label>
               <Input
                 id="confirmation"
                 value={confirmationText}
@@ -1091,7 +1091,7 @@ function Preview({
                     <Button
                       key={link.id}
                       asChild
-                      variant={buttonVariant as any}
+                      variant={buttonVariant}
                       className={isStoreLayout 
                         ? "h-16 text-xs flex flex-col p-2" 
                         : "w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
