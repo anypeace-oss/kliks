@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
-import { profiles, blocks as blocksTable } from "@/lib/schema";
+import { profiles, links } from "@/lib/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import * as Tabler from "@tabler/icons-react";
 import {
   Instagram,
   Music,
@@ -14,8 +13,10 @@ import {
   Github,
   Send,
   MessageCircle,
+  ArrowUpRight,
 } from "lucide-react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 
 // Type definitions
 interface ProfileData {
@@ -29,35 +30,13 @@ interface ProfileData {
   socialLinks?: Record<string, string>;
 }
 
-interface BlockData {
+interface LinkData {
   id: string;
   profileId: string;
-  type: string;
-  title: string | null;
-  url: string | null;
-  description: string | null;
+  title: string;
+  url: string;
   isActive: boolean;
-  openInNewTab: boolean | null;
   sortOrder: number;
-  scheduledStart: Date | null;
-  scheduledEnd: Date | null;
-  productId: string | null;
-  affiliateId: string | null;
-  config: {
-    icon?: string;
-    thumbnail?: string;
-    imageUrl?: string;
-    alt?: string;
-    text?: string;
-    buttonStyle?: {
-      backgroundColor?: string;
-      textColor?: string;
-      borderRadius?: string;
-    };
-    [key: string]: unknown;
-  } | null;
-  clickLimit: number | null;
-  password: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,18 +70,16 @@ export default async function ProfilePage({
     notFound();
   }
 
-  // Fetch blocks for this profile, sorted by sortOrder
-  const allBlocks = await db
+  // Fetch links for this profile, sorted by sortOrder
+  const allLinks = await db
     .select()
-    .from(blocksTable)
-    .where(eq(blocksTable.profileId, prof.id))
-    .orderBy(asc(blocksTable.sortOrder));
+    .from(links)
+    .where(eq(links.profileId, prof.id))
+    .orderBy(asc(links.sortOrder));
 
   const now = new Date();
-  const visibleBlocks = allBlocks.filter((b: BlockData) => {
-    if (!b.isActive) return false;
-    if (b.scheduledStart && b.scheduledStart > now) return false;
-    if (b.scheduledEnd && b.scheduledEnd < now) return false;
+  const visibleLinks = allLinks.filter((l: LinkData) => {
+    if (!l.isActive) return false;
     return true;
   });
 
@@ -124,7 +101,7 @@ export default async function ProfilePage({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col p-4 max-w-5xl mx-auto py-10">
+    <div className="min-h-screen  flex flex-col items-center justify-center p-4 max-w-5xl mx-auto py-10">
       {/* Background Image */}
       {prof.backgroundImage && (
         <div
@@ -134,7 +111,7 @@ export default async function ProfilePage({
       )}
 
       {/* Profile Info */}
-      <div className="px-4 pb-10 -mt-16 relative">
+      <div className="px-4 pb-10  relative">
         {/* Avatar */}
         <div className="relative">
           <Image
@@ -157,86 +134,38 @@ export default async function ProfilePage({
 
         {/* Social links */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          {Object.entries(prof.socialLinks || {}).map(
-            ([platform, url]) => (
-              <a
-                key={platform}
-                href={String(url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-600 transition"
-                aria-label={platform}
-              >
-                {SocialIcon(platform)}
-              </a>
-            )
-          )}
+          {Object.entries(prof.socialLinks || {}).map(([platform, url]) => (
+            <a
+              key={platform}
+              href={String(url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-full border-2"
+              aria-label={platform}
+            >
+              {SocialIcon(platform)}
+            </a>
+          ))}
         </div>
 
-        {/* Blocks */}
+        {/* Links */}
         <div className="mt-6 space-y-4">
-          {visibleBlocks.map((block: BlockData) => {
-            const cfg = block.config || {};
-            if (block.type === "separator") {
-              return <hr key={block.id} className="border-gray-200" />;
-            }
-            if (block.type === "text") {
-              return (
-                <div key={block.id} className="text-gray-800">
-                  {cfg.text || block.title}
-                </div>
-              );
-            }
-            if (block.type === "image") {
-              const src = cfg.imageUrl || cfg.thumbnail;
-              if (!src) return null;
-              return (
-                <Image
-                  key={block.id}
-                  src={src}
-                  alt={cfg.alt || block.title || "image"}
-                  className="w-full rounded-lg"
-                  width={600}
-                  height={400}
-                />
-              );
-            }
-            // link/product/affiliate style button
-            const TablerIcon = cfg.icon ? (Tabler as unknown as Record<string, React.ComponentType<{ className?: string }>>)[cfg.icon] : undefined;
-            const style: React.CSSProperties = {
-              backgroundColor:
-                cfg.buttonStyle?.backgroundColor || "transparent",
-              color: cfg.buttonStyle?.textColor || "inherit",
-              borderRadius: cfg.buttonStyle?.borderRadius || "9999px",
-            };
+          {visibleLinks.map((link: LinkData) => {
             return (
-              <a
-                key={block.id}
-                href={block.url || "#"}
-                target={block.openInNewTab ? "_blank" : "_self"}
-                rel={block.openInNewTab ? "noopener noreferrer" : undefined}
-                className="block w-full rounded-full border-2 border-gray-200 hover:border-blue-600 hover:bg-blue-600 hover:text-white transition p-3 text-center"
-                style={style}
-              >
-                <span className="inline-flex items-center gap-2 justify-center">
-                  {cfg.thumbnail && (
-                    <Image
-                      src={cfg.thumbnail}
-                      alt="thumb"
-                      className="w-5 h-5 rounded"
-                      width={20}
-                      height={20}
-                    />
-                  )}
-                  {TablerIcon && <TablerIcon className="w-4 h-4" />}
-                  <span className="font-medium">{block.title}</span>
-                </span>
-                {block.description && (
-                  <div className="text-xs opacity-80 mt-1">
-                    {block.description}
-                  </div>
-                )}
-              </a>
+              <Button asChild variant={"default"} key={link.id}>
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target={"_blank"}
+                  rel={"noopener noreferrer"}
+                  className="block w-full "
+                >
+                  <span className="flex  justify-between">
+                    <span className="font-medium">{link.title}</span>
+                    <ArrowUpRight/>
+                  </span>
+                </a>
+              </Button>
             );
           })}
         </div>

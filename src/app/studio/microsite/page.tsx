@@ -1,19 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import {
-  createBlock,
-  deleteBlock,
-  getBlocks,
+  createLink,
+  deleteLink,
+  getLinks,
   getProfiles,
-  updateBlock,
+  updateLink,
   updateProfile,
 } from "@/lib/api";
 import type {
-  BlockCreateInput,
-  BlockUpdateInput,
+  LinkCreateInput,
+  LinkUpdateInput,
   ProfileUpdateInput,
 } from "@/lib/validation/link-in-bio";
 
@@ -36,12 +36,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -66,24 +66,12 @@ import {
   Github,
   Send,
   MessageCircle,
-  Calendar,
-  Lock,
-  ImageIcon,
+  Save,
 } from "lucide-react";
-import { IconIcons } from "@tabler/icons-react";
-import * as Tabler from "@tabler/icons-react";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-// Type definitions for microsite components
+// Types
 interface ProfileData {
   id: string;
   username: string;
@@ -101,38 +89,14 @@ interface ProfileData {
   seoDescription?: string;
 }
 
-interface BlockData {
+interface LinkData {
   id: string;
   profileId: string;
-  type: string;
-  title: string | null;
-  url: string | null;
-  description: string | null;
+  title: string;
+  url: string;
   isActive: boolean;
-  openInNewTab: boolean | null;
+  openInNewTab: boolean;
   sortOrder: number;
-  scheduledStart: Date | null;
-  scheduledEnd: Date | null;
-  productId: string | null;
-  affiliateId: string | null;
-  config: {
-    icon?: string;
-    thumbnail?: string;
-    imageUrl?: string;
-    alt?: string;
-    text?: string;
-    buttonStyle?: {
-      backgroundColor?: string;
-      textColor?: string;
-      borderRadius?: string;
-    };
-    separatorStyle?: string;
-    separatorHeight?: number;
-    separatorColor?: string;
-    [key: string]: unknown;
-  } | null;
-  clickLimit: number | null;
-  password: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -141,48 +105,92 @@ interface SocialIconMap {
   [key: string]: React.ComponentType<{ className?: string }>;
 }
 
-// --- Inline Profile Section (editable displayName, bio, avatar) + social bar ---
+interface PendingChanges {
+  profile: Partial<ProfileData>;
+  links: Record<string, Partial<LinkData>>;
+  hasChanges: boolean;
+}
+
+// Validation schemas
+const ProfileSchema = z.object({
+  displayName: z.string().min(1, "Display name is required"),
+  bio: z.string().optional(),
+  socialLinks: z.record(z.string(), z.string()).optional(),
+});
+
+const LinkSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  url: z.string().url("Please enter a valid URL (including http:// or https://)"),
+});
+
+// Profile Section Component
 function ProfileSection({
   profile,
   onUpdate,
-  onAddSocial,
-  onDeleteSocial,
 }: {
   profile: ProfileData;
   onUpdate: (updates: Partial<ProfileData>) => void;
-  onAddSocial: (platform: string, value: string) => void;
-  onDeleteSocial: (platform: string) => void;
 }) {
-  const [editingName, setEditingName] = useState(false);
-  const [editingBio, setEditingBio] = useState(false);
-  const [socialOpen, setSocialOpen] = useState(false);
+  const [socialDialogOpen, setSocialDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [urlValue, setUrlValue] = useState("");
-  const [urlError, setUrlError] = useState<string>("");
 
-  const socials = Object.entries(profile?.socialLinks || {}) as Array<
-    [string, string]
-  >;
+  const form = useForm({
+    resolver: zodResolver(ProfileSchema),
+    defaultValues: {
+      displayName: profile?.displayName || profile?.username || "",
+      bio: profile?.bio || "",
+      socialLinks: profile?.socialLinks || {},
+    },
+  });
 
-  const SocialIcon = ({ name }: { name: string }) => {
-    const map: SocialIconMap = {
-      instagram: Instagram,
-      tiktok: Music,
-      youtube: Youtube,
-      email: Mail,
-      facebook: Facebook,
-      twitter: Twitter,
-      linkedin: Linkedin,
-      github: Github,
-      telegram: Send,
-      whatsapp: MessageCircle,
+  const { watch, setValue } = form;
+  const formData = watch();
+
+  // Track initial values to prevent unnecessary updates
+  const initialValuesRef = useRef<{
+    displayName: string;
+    bio: string;
+    socialLinks: Record<string, string>;
+  }>({ displayName: "", bio: "", socialLinks: {} });
+
+  // Real-time updates
+  useEffect(() => {
+    if (profile) {
+      const newValues = {
+        displayName: profile.displayName || profile.username || "",
+        bio: profile.bio || "",
+        socialLinks: profile.socialLinks || {},
+      };
+      
+      form.reset(newValues);
+      initialValuesRef.current = newValues;
+    }
+  }, [profile, form]);
+
+  // Only update when values actually change
+  useEffect(() => {
+    const current = {
+      displayName: formData.displayName,
+      bio: formData.bio,
+      socialLinks: formData.socialLinks as Record<string, string> | undefined || {},
     };
-    const Icon = map[name];
-    return Icon ? <Icon className="w-4 h-4" /> : null;
-  };
+    
+    const initial = initialValuesRef.current;
+    
+    // Check if values have actually changed from initial values
+    const hasChanged = 
+      current.displayName !== initial.displayName ||
+      current.bio !== initial.bio ||
+      JSON.stringify(current.socialLinks) !== JSON.stringify(initial.socialLinks);
+    
+    if (hasChanged) {
+      onUpdate(current);
+    }
+  }, [formData.displayName, formData.bio, formData.socialLinks, onUpdate]);
 
-  const platformList = [
+  const socialPlatforms = [
     { id: "instagram", label: "Instagram" },
     { id: "tiktok", label: "TikTok" },
     { id: "youtube", label: "YouTube" },
@@ -194,9 +202,71 @@ function ProfileSection({
     { id: "telegram", label: "Telegram" },
     { id: "whatsapp", label: "WhatsApp" },
   ];
-  const filteredPlatforms = platformList.filter((p) =>
+
+  const socialIcons: SocialIconMap = {
+    instagram: Instagram,
+    tiktok: Music,
+    youtube: Youtube,
+    email: Mail,
+    facebook: Facebook,
+    twitter: Twitter,
+    linkedin: Linkedin,
+    github: Github,
+    telegram: Send,
+    whatsapp: MessageCircle,
+  };
+
+  const filteredPlatforms = socialPlatforms.filter((p) =>
     p.label.toLowerCase().includes(search.toLowerCase())
   );
+
+  const addSocial = () => {
+    const trimmedUrl = urlValue.trim();
+    if (!trimmedUrl || !selectedPlatform) return;
+    
+    if (!/^https?:\/\//i.test(trimmedUrl)) {
+      toast.error("URL must start with http:// or https://");
+      return;
+    }
+    
+    setValue("socialLinks", {
+      ...formData.socialLinks,
+      [selectedPlatform]: trimmedUrl,
+    });
+    
+    resetSocialForm();
+    setSocialDialogOpen(false);
+    toast.success("Social link added!");
+  };
+
+  const deleteSocial = () => {
+    if (!selectedPlatform) return;
+    
+    const newSocialLinks = { ...formData.socialLinks };
+    delete newSocialLinks[selectedPlatform];
+    setValue("socialLinks", newSocialLinks);
+    
+    resetSocialForm();
+    setSocialDialogOpen(false);
+    toast.success("Social link removed!");
+  };
+
+  const resetSocialForm = () => {
+    setSelectedPlatform("");
+    setUrlValue("");
+    setSearch("");
+  };
+
+  const handleSocialEdit = (platform: string) => {
+    setSelectedPlatform(platform);
+    setUrlValue(String(formData.socialLinks?.[platform] || ""));
+    setSocialDialogOpen(true);
+  };
+
+  const SocialIcon = ({ name }: { name: string }) => {
+    const Icon = socialIcons[name];
+    return Icon ? <Icon className="w-4 h-4" /> : null;
+  };
 
   return (
     <Card>
@@ -208,123 +278,91 @@ function ProfileSection({
           <Avatar className="w-16 h-16">
             <AvatarImage
               src={profile?.avatar || "/placeholder.svg"}
-              alt={profile?.displayName || profile?.username}
+              alt={formData.displayName || profile?.username}
             />
             <AvatarFallback>
-              {(profile?.displayName || profile?.username || "")
+              {(formData.displayName || profile?.username || "")
                 .charAt(0)
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 space-y-2">
-            {editingName ? (
+          
+          <div className="flex-1 space-y-3">
+            <div>
+              <Label htmlFor="displayName">Display Name</Label>
               <Input
-                defaultValue={profile?.displayName || ""}
-                onBlur={(e) => {
-                  onUpdate({ displayName: e.target.value });
-                  setEditingName(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = (e.target as HTMLInputElement).value;
-                    onUpdate({ displayName: val });
-                    setEditingName(false);
-                  }
-                }}
+                id="displayName"
+                {...form.register("displayName")}
                 className="text-xl font-semibold"
-                autoFocus
+                placeholder="Your display name"
               />
-            ) : (
-              <h1
-                className="text-xl font-semibold cursor-pointer hover:text-primary"
-                onClick={() => setEditingName(true)}
-              >
-                {profile?.displayName || profile?.username}
-              </h1>
-            )}
-            {editingBio ? (
+            </div>
+            
+            <div>
+              <Label htmlFor="bio">Bio</Label>
               <Input
-                defaultValue={profile?.bio || ""}
-                onBlur={(e) => {
-                  onUpdate({ bio: e.target.value });
-                  setEditingBio(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = (e.target as HTMLInputElement).value;
-                    onUpdate({ bio: val });
-                    setEditingBio(false);
-                  }
-                }}
+                id="bio"
+                {...form.register("bio")}
+                placeholder="Tell people about yourself"
                 className="text-muted-foreground"
-                autoFocus
               />
-            ) : (
-              <p
-                className="text-muted-foreground cursor-pointer hover:text-foreground"
-                onClick={() => setEditingBio(true)}
-              >
-                {profile?.bio || "Add a short bio"}
-              </p>
-            )}
-            {/* Show only existing social links here */}
+            </div>
+            
             <div className="flex items-center gap-2">
-              {socials.map(([key]) => (
+              {Object.keys(formData.socialLinks || {}).map((platform) => (
                 <Button
-                  key={key}
+                  key={platform}
                   variant="ghost"
                   size="sm"
                   className="p-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setSelectedPlatform(key);
-                    const existing = profile?.socialLinks?.[key] || "";
-                    setUrlValue(existing);
-                    setUrlError("");
-                    setSocialOpen(true);
-                  }}
+                  onClick={() => handleSocialEdit(platform)}
                 >
-                  <SocialIcon name={key} />
+                  <SocialIcon name={platform} />
                 </Button>
               ))}
-              <Dialog open={socialOpen} onOpenChange={setSocialOpen}>
+              
+              <Dialog open={socialDialogOpen} onOpenChange={setSocialDialogOpen}>
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="p-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={resetSocialForm}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Add social</DialogTitle>
+                    <DialogTitle>
+                      {selectedPlatform ? "Edit Social Link" : "Add Social Link"}
+                    </DialogTitle>
                   </DialogHeader>
+                  
                   <div className="space-y-4">
                     {!selectedPlatform ? (
                       <div className="space-y-3">
-                        <div>
-                          <Input
-                            placeholder="Search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                          />
-                        </div>
+                        <Input
+                          placeholder="Search platforms..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
                         <div className="max-h-60 overflow-y-auto space-y-1">
-                          {filteredPlatforms.map((p) => {
-                            const exists = !!(
-                              profile?.socialLinks && profile.socialLinks[p.id]
-                            );
+                          {filteredPlatforms.map((platform) => {
+                            const hasLink = !!(formData.socialLinks?.[platform.id]);
                             return (
                               <Button
-                                key={p.id}
+                                key={platform.id}
                                 variant="ghost"
                                 className="w-full justify-between h-10"
-                                onClick={() => setSelectedPlatform(p.id)}
+                                onClick={() => {
+                                  setSelectedPlatform(platform.id);
+                                  setUrlValue(String(formData.socialLinks?.[platform.id] || ""));
+                                }}
                               >
-                                <span>{p.label}</span>
-                                {exists ? (
-                                  <span>✓</span>
+                                <span>{platform.label}</span>
+                                {hasLink ? (
+                                  <span className="text-primary">✓</span>
                                 ) : (
                                   <Plus className="w-4 h-4" />
                                 )}
@@ -335,87 +373,30 @@ function ProfileSection({
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="text-sm">
-                          {
-                            platformList.find((x) => x.id === selectedPlatform)
-                              ?.label
-                          }
+                        <div className="text-sm font-medium">
+                          {socialPlatforms.find((p) => p.id === selectedPlatform)?.label}
                         </div>
-                        <div className="space-y-1">
-                          <Input
-                            placeholder="https://social.url"
-                            value={urlValue}
-                            onChange={(e) => {
-                              setUrlValue(e.target.value);
-                              setUrlError("");
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                const v = urlValue.trim();
-                                if (!/^https?:\/\//i.test(v)) {
-                                  setUrlError(
-                                    "URL must start with http:// or https://"
-                                  );
-                                  return;
-                                }
-                                onAddSocial(selectedPlatform, v);
-                                setSelectedPlatform("");
-                                setUrlValue("");
-                                setUrlError("");
-                                setSocialOpen(false);
-                              }
-                            }}
-                            autoFocus
-                          />
-                          {urlError && (
-                            <p className="text-xs text-destructive">
-                              {urlError}
-                            </p>
-                          )}
-                        </div>
+                        <Input
+                          placeholder="https://example.com/yourprofile"
+                          value={urlValue}
+                          onChange={(e) => setUrlValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") addSocial();
+                          }}
+                          autoFocus
+                        />
                         <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedPlatform("");
-                              setUrlValue("");
-                              setUrlError("");
-                            }}
-                            className="bg-transparent"
-                          >
+                          <Button variant="outline" onClick={resetSocialForm}>
                             Back
                           </Button>
-                          <Button
-                            onClick={() => {
-                              const v = urlValue.trim();
-                              if (!/^https?:\/\//i.test(v)) {
-                                setUrlError(
-                                  "URL must start with http:// or https://"
-                                );
-                                return;
-                              }
-                              onAddSocial(selectedPlatform, v);
-                              setSelectedPlatform("");
-                              setUrlValue("");
-                              setUrlError("");
-                              setSocialOpen(false);
-                            }}
-                          >
+                          <Button onClick={addSocial}>
                             Save
                           </Button>
-                          {profile?.socialLinks?.[selectedPlatform] && (
-                            <Button
-                              variant="destructive"
-                              onClick={() => {
-                                onDeleteSocial(selectedPlatform);
-                                setSelectedPlatform("");
-                                setUrlValue("");
-                                setSocialOpen(false);
-                              }}
-                            >
+                          {formData.socialLinks?.[selectedPlatform] ? (
+                            <Button variant="destructive" onClick={deleteSocial}>
                               Delete
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     )}
@@ -430,107 +411,15 @@ function ProfileSection({
   );
 }
 
-// Icon picker dialog with basic virtualization
-function IconPickerDialog({
-  open,
-  onOpenChange,
-  onPick,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onPick: (name: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const ICON_SIZE = 80;
-  const ICONS = useMemo(
-    () => Object.keys(Tabler).filter((k) => k.startsWith("Icon")),
-    []
-  );
-  const filtered = useMemo(
-    () => ICONS.filter((k) => k.toLowerCase().includes(query.toLowerCase())),
-    [ICONS, query]
-  );
-  const [scrollTop, setScrollTop] = useState(0);
-  const itemsPerRow = 4;
-  const rowHeight = ICON_SIZE + 24;
-  const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
-  const endRow = startRow + 10; // buffer
-  const startIndex = startRow * itemsPerRow;
-  const endIndex = Math.min(filtered.length, (endRow + 1) * itemsPerRow);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add Thumbnail</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Input
-            placeholder="Search icons"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div
-            ref={containerRef}
-            className="max-h-80 overflow-auto border rounded-lg p-2"
-            onScroll={(e) =>
-              setScrollTop((e.target as HTMLDivElement).scrollTop)
-            }
-          >
-            <div
-              style={{
-                height: Math.ceil(filtered.length / itemsPerRow) * rowHeight,
-              }}
-              className="relative"
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: startRow * rowHeight,
-                  left: 0,
-                  right: 0,
-                }}
-                className="grid grid-cols-4 gap-3 p-2"
-              >
-                {filtered.slice(startIndex, endIndex).map((name) => {
-                  const IconComp = (
-                    Tabler as unknown as Record<
-                      string,
-                      React.ComponentType<{ className?: string }>
-                    >
-                  )[name];
-                  return (
-                    <Button
-                      key={name}
-                      variant="outline"
-                      className="h-20"
-                      onClick={() => onPick(name)}
-                    >
-                      <IconComp className="w-6 h-6" />
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// --- Builder-style Link Card ---
-function BuilderLinkCard({
-  block,
+// Link Card Component
+function LinkCard({
+  link,
   onUpdate,
   onDelete,
-  onSave,
 }: {
-  block: BlockData;
-  onUpdate: (updates: Partial<BlockData>) => void;
+  link: LinkData;
+  onUpdate: (updates: Partial<LinkData>) => void;
   onDelete: () => void;
-  onSave: () => void;
 }) {
   const {
     attributes,
@@ -539,75 +428,69 @@ function BuilderLinkCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: block.id });
+  } = useSortable({ id: link.id });
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  } as React.CSSProperties;
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [editingUrl, setEditingUrl] = useState(false);
-  // per-card URL form with zod validation
-  const UrlSchema = useMemo(
-    () =>
-      z.object({ url: z.string().url("URL must include http:// or https://") }),
-    []
-  );
-  const urlForm = useForm<{ url: string }>({
-    resolver: zodResolver(UrlSchema),
-    defaultValues: { url: block.url || "" },
-    mode: "onSubmit",
+  };
+
+  const form = useForm({
+    resolver: zodResolver(LinkSchema),
+    defaultValues: {
+      title: link.title || "",
+      url: link.url || "",
+    },
   });
+
+  const { watch } = form;
+  const formData = watch();
+
+  // Track initial values to prevent unnecessary updates
+  const initialValuesRef = useRef({ title: "", url: "" });
+
+  // Reset form when link data changes
   useEffect(() => {
-    urlForm.reset({ url: block.url || "" });
-  }, [block.url, urlForm]);
+    const newValues = {
+      title: link.title || "",
+      url: link.url || "",
+    };
+    
+    form.reset(newValues);
+    initialValuesRef.current = newValues;
+  }, [link.title, link.url, form]);
 
-  // dialogs local
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [thumbOpen, setThumbOpen] = useState(false);
-  const [iconOpen, setIconOpen] = useState(false);
-  const [tempStart, setTempStart] = useState<string>("");
-  const [tempEnd, setTempEnd] = useState<string>("");
-  const [tempPassword, setTempPassword] = useState<string>("");
-  const [tempThumb, setTempThumb] = useState<string>("");
-
-  // extra local for image/separator config
-  const [imageUrlDraft, setImageUrlDraft] = useState<string>("");
-  const [imageAltDraft, setImageAltDraft] = useState<string>("");
-  const [sepStyle, setSepStyle] = useState<"transparent" | "bordered">(
-    "transparent"
-  );
-  const [sepHeight, setSepHeight] = useState<number>(8);
-  const [sepColor, setSepColor] = useState<string>("#e5e7eb");
-
+  // Only update when values actually change from initial values
   useEffect(() => {
-    setTempStart(
-      block.scheduledStart
-        ? new Date(block.scheduledStart).toISOString().slice(0, 16)
-        : ""
-    );
-    setTempEnd(
-      block.scheduledEnd
-        ? new Date(block.scheduledEnd).toISOString().slice(0, 16)
-        : ""
-    );
-    setTempPassword(block.password || "");
-    setTempThumb(block.config?.thumbnail || "");
-    setImageUrlDraft(block.config?.imageUrl || block.config?.thumbnail || "");
-    setImageAltDraft(block.config?.alt || "");
-    setSepStyle(
-      block.config?.separatorStyle === "bordered" ? "bordered" : "transparent"
-    );
-    setSepHeight(block.config?.separatorHeight || 8);
-    setSepColor(block.config?.separatorColor || "#e5e7eb");
-  }, [block]);
+    const current = {
+      title: formData.title,
+      url: formData.url,
+    };
+    
+    const initial = initialValuesRef.current;
+    
+    // Check if values have actually changed from initial values
+    const hasChanged = 
+      current.title !== initial.title ||
+      current.url !== initial.url;
+    
+    if (hasChanged && (current.title || current.url)) {
+      onUpdate(current);
+    }
+  }, [formData.title, formData.url, onUpdate]);
+
+  const handleDelete = () => {
+    if (confirm("Delete this link?")) {
+      onDelete();
+    }
+  };
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className={`p-4 ${isDragging ? "opacity-50" : ""} ${
-        !block.isActive ? "bg-muted/50" : ""
+      className={`p-4 transition-opacity ${isDragging ? "opacity-50" : ""} ${
+        !link.isActive ? "bg-muted/50" : ""
       }`}
     >
       <div className="flex items-center gap-3">
@@ -620,464 +503,229 @@ function BuilderLinkCard({
         >
           <GripVertical className="w-4 h-4" />
         </Button>
+        
         <div className="flex-1 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-1">
-              {editingTitle ? (
-                <Input
-                  defaultValue={block.title || ""}
-                  onBlur={(e) => {
-                    onUpdate({ title: e.target.value });
-                    setEditingTitle(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const val = (e.target as HTMLInputElement).value;
-                      onUpdate({ title: val });
-                      setEditingTitle(false);
-                      onSave();
-                    }
-                  }}
-                  className="font-medium"
-                  autoFocus
-                />
-              ) : (
-                <h3
-                  className="font-medium cursor-pointer hover:text-primary flex items-center gap-1"
-                  onClick={() => setEditingTitle(true)}
-                >
-                  {block.title ||
-                    (block.type === "separator" ? "Separator" : "Untitled")}
-                  <Edit2 className="w-3 h-3" />
-                </h3>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!block.isActive}
-                onCheckedChange={(checked) => onUpdate({ isActive: checked })}
-              />
-            </div>
-          </div>
-
-          {/* Per-type editors */}
-          {block.type === "link" && (
-            <Form {...urlForm}>
-              <form
-                onSubmit={urlForm.handleSubmit((values) => {
-                  onUpdate({ url: values.url.trim() });
-                  setEditingUrl(false);
-                  onSave();
-                })}
-              >
-                {editingUrl ? (
-                  <FormField
-                    name="url"
-                    control={urlForm.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="https://..."
-                            onBlur={() =>
-                              urlForm.handleSubmit((v) => {
-                                onUpdate({ url: v.url.trim() });
-                                setEditingUrl(false);
-                              })()
-                            }
-                            autoFocus
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <p
-                    className="text-sm text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1"
-                    onClick={() => setEditingUrl(true)}
-                  >
-                    {block.url || "URL"}
-                    <Edit2 className="w-3 h-3" />
-                  </p>
-                )}
-              </form>
-            </Form>
-          )}
-
-          {block.type === "text" && (
-            <Textarea
-              value={block.config?.text || ""}
-              placeholder="Write some text..."
-              onChange={(e) =>
-                onUpdate({
-                  config: { ...(block.config || {}), text: e.target.value },
-                })
-              }
+            <Input
+              {...form.register("title")}
+              placeholder="Link title"
+              className="font-medium border-0 px-0 shadow-none focus-visible:ring-0 bg-transparent"
             />
-          )}
-
-          {block.type === "image" && (
-            <div className="grid gap-2">
-              <Input
-                value={imageUrlDraft}
-                placeholder="https://image.url"
-                onChange={(e) => setImageUrlDraft(e.target.value)}
-                onBlur={() =>
-                  onUpdate({
-                    config: {
-                      ...(block.config || {}),
-                      imageUrl: imageUrlDraft || undefined,
-                    },
-                  })
-                }
-              />
-              <Input
-                value={imageAltDraft}
-                placeholder="Alt text"
-                onChange={(e) => setImageAltDraft(e.target.value)}
-                onBlur={() =>
-                  onUpdate({
-                    config: {
-                      ...(block.config || {}),
-                      alt: imageAltDraft || undefined,
-                    },
-                  })
-                }
-              />
-            </div>
-          )}
-
-          {block.type === "separator" && (
-            <div className="grid grid-cols-3 gap-2 items-end">
-              <div className="col-span-3 flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sepStyle === "transparent" ? "default" : "outline"}
-                  onClick={() => {
-                    setSepStyle("transparent");
-                    onUpdate({
-                      config: {
-                        ...(block.config || {}),
-                        separatorStyle: "transparent",
-                      },
-                    });
-                  }}
-                >
-                  Transparent
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={sepStyle === "bordered" ? "default" : "outline"}
-                  onClick={() => {
-                    setSepStyle("bordered");
-                    onUpdate({
-                      config: {
-                        ...(block.config || {}),
-                        separatorStyle: "bordered",
-                      },
-                    });
-                  }}
-                >
-                  Bordered
-                </Button>
-              </div>
-              <div>
-                <Label className="text-xs">Height</Label>
-                <Input
-                  type="number"
-                  value={sepHeight}
-                  onChange={(e) => {
-                    const v = Number(e.target.value || 0);
-                    setSepHeight(v);
-                    onUpdate({
-                      config: { ...(block.config || {}), separatorHeight: v },
-                    });
-                  }}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Color</Label>
-                <Input
-                  type="color"
-                  value={sepColor}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setSepColor(v);
-                    onUpdate({
-                      config: { ...(block.config || {}), separatorColor: v },
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
+            <Switch
+              checked={link.isActive}
+              aria-label="Active"
+              id="active"
+              
+              onCheckedChange={(checked) => onUpdate({ isActive: checked })}
+            />
+          </div>
+          
+          <Input
+            {...form.register("url")}
+            placeholder="https://example.com"
+            className="text-sm text-muted-foreground border-0 px-0 shadow-none focus-visible:ring-0 bg-transparent"
+          />
+          
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-xs">0 clicks</span>
-              {block.type !== "separator" && (
-                <Button
-                  size={"sm"}
-                  variant={"ghost"}
-                  onClick={() => setScheduleOpen(true)}
-                >
-                  <Calendar className="w-4 h-4" />
-                </Button>
-              )}
-              {block.type !== "text" && block.type !== "separator" && (
-                <Button
-                  size={"sm"}
-                  variant={"ghost"}
-                  onClick={() => setPasswordOpen(true)}
-                >
-                  <Lock className="w-4 h-4" />
-                </Button>
-              )}
-              {block.type !== "separator" && (
-                <Button
-                  size={"sm"}
-                  variant={"ghost"}
-                  onClick={() => setThumbOpen(true)}
-                >
-                  <ImageIcon className="w-4 h-4" />
-                </Button>
-              )}
-              {block.type !== "separator" && (
-                <Button
-                  size={"sm"}
-                  variant={"ghost"}
-                  onClick={() => setIconOpen(true)}
-                >
-                  <IconIcons className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
+            <span className="text-xs text-muted-foreground">0 clicks</span>
             <Button
               variant="ghost"
               size="sm"
               className="p-1 text-muted-foreground hover:text-destructive"
-              onClick={onDelete}
+              onClick={handleDelete}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
         </div>
       </div>
-      {/* dialogs remain */}
-      {/* Schedule */}
-      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schedule</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Start</Label>
-              <Input
-                type="datetime-local"
-                value={tempStart}
-                onChange={(e) => setTempStart(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>End</Label>
-              <Input
-                type="datetime-local"
-                value={tempEnd}
-                onChange={(e) => setTempEnd(e.target.value)}
-              />
-            </div>
-            <div className="col-span-2 flex gap-2">
-              <Button
-                onClick={() => {
-                  onUpdate({
-                    scheduledStart: tempStart ? new Date(tempStart) : undefined,
-                    scheduledEnd: tempEnd ? new Date(tempEnd) : undefined,
-                  });
-                  setScheduleOpen(false);
-                }}
-              >
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setScheduleOpen(false)}
-                className="bg-transparent"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Password (hidden for text/separator via toolbar) */}
-      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Password</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <Input
-              type="text"
-              placeholder="Set a password"
-              value={tempPassword}
-              onChange={(e) => setTempPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onUpdate({ password: tempPassword || undefined });
-                  setPasswordOpen(false);
-                  onSave();
-                }
-              }}
-            />
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  onUpdate({ password: tempPassword || undefined });
-                  setPasswordOpen(false);
-                }}
-              >
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setPasswordOpen(false)}
-                className="bg-transparent"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Thumbnail */}
-      <Dialog open={thumbOpen} onOpenChange={setThumbOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Thumbnail</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <Input
-              type="url"
-              placeholder="https://image.url"
-              value={tempThumb}
-              onChange={(e) => setTempThumb(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onUpdate({
-                    config: {
-                      ...(block.config || {}),
-                      thumbnail: tempThumb || undefined,
-                    },
-                  });
-                  setThumbOpen(false);
-                  onSave();
-                }
-              }}
-            />
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  onUpdate({
-                    config: {
-                      ...(block.config || {}),
-                      thumbnail: tempThumb || undefined,
-                    },
-                  });
-                  setThumbOpen(false);
-                }}
-              >
-                Save
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setThumbOpen(false)}
-                className="bg-transparent"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Icons */}
-      <IconPickerDialog
-        open={iconOpen}
-        onOpenChange={setIconOpen}
-        onPick={(name) => {
-          onUpdate({ config: { ...(block.config || {}), icon: name } });
-          setIconOpen(false);
-        }}
-      />
     </Card>
   );
 }
 
-// Helpers for profile merge and blocks merge
-function buildProfileUpdatePayload(
-  base: ProfileData,
-  updates: Partial<ProfileData>
-): ProfileUpdateInput {
-  const nz = (v: unknown) => (v === null ? undefined : v);
-  return {
-    id: nz(base.id),
-    username: nz(base.username),
-    displayName: nz(updates.displayName ?? base.displayName ?? base.username),
-    bio: nz(updates.bio ?? base.bio),
-    avatar: nz(updates.avatar ?? base.avatar),
-    backgroundImage: nz(updates.backgroundImage ?? base.backgroundImage),
-    isPublic: nz(updates.isPublic ?? base.isPublic ?? true),
-    analyticsEnabled: nz(
-      updates.analyticsEnabled ?? base.analyticsEnabled ?? true
-    ),
-    layoutTemplateId: nz(updates.layoutTemplateId ?? base.layoutTemplateId),
-    colorSchemeId: nz(updates.colorSchemeId ?? base.colorSchemeId),
-    customCss: nz(updates.customCss ?? base.customCss),
-    socialLinks: nz(updates.socialLinks ?? base.socialLinks),
-    seoTitle: nz(updates.seoTitle ?? base.seoTitle),
-    seoDescription: nz(updates.seoDescription ?? base.seoDescription),
-  } as ProfileUpdateInput;
+// Add Link Dialog Component
+function AddLinkDialog({
+  open,
+  onOpenChange,
+  onAdd,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdd: (data: { title: string; url: string }) => void;
+}) {
+  const form = useForm({
+    resolver: zodResolver(LinkSchema),
+    defaultValues: { title: "", url: "" },
+  });
+
+  const handleSubmit = (data: { title: string; url: string }) => {
+    onAdd(data);
+    form.reset();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add New Link</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <div>
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              {...form.register("title")}
+              placeholder="Link title"
+              autoFocus
+            />
+            {form.formState.errors.title && (
+              <p className="text-sm text-destructive mt-1">
+                {form.formState.errors.title.message}
+              </p>
+            )}
+          </div>
+          
+          <div>
+            <Label htmlFor="url">URL</Label>
+            <Input
+              id="url"
+              {...form.register("url")}
+              placeholder="https://example.com"
+            />
+            {form.formState.errors.url && (
+              <p className="text-sm text-destructive mt-1">
+                {form.formState.errors.url.message}
+              </p>
+            )}
+          </div>
+          
+          <div className="flex gap-2 pt-4">
+            <Button type="submit" className="flex-1">
+              Add Link
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
-function buildBlockUpdatePayload(
-  block: BlockData,
-  updates: Partial<BlockData>
-): BlockUpdateInput {
-  const nz = (v: unknown) => (v === null ? undefined : v);
-  // Merge config if provided in updates
-  const mergedConfig = updates.config
-    ? {
-        ...(block.config || {}),
-        ...(updates.config as Record<string, unknown>),
-      }
-    : block.config;
-  return {
-    id: block.id,
-    profileId: nz(block.profileId),
-    title: nz(updates.title ?? block.title),
-    url: nz(updates.url ?? block.url),
-    description: nz(updates.description ?? block.description),
-    type: nz(updates.type ?? block.type ?? "link"),
-    productId: nz(updates.productId ?? block.productId),
-    affiliateId: nz(updates.affiliateId ?? block.affiliateId),
-    config: nz(mergedConfig),
-    isActive: nz(updates.isActive ?? block.isActive),
-    openInNewTab: nz(updates.openInNewTab ?? block.openInNewTab),
-    sortOrder: nz(updates.sortOrder ?? block.sortOrder),
-    scheduledStart: nz(updates.scheduledStart ?? block.scheduledStart),
-    scheduledEnd: nz(updates.scheduledEnd ?? block.scheduledEnd),
-    clickLimit: nz(updates.clickLimit ?? block.clickLimit),
-    password: nz(updates.password ?? block.password),
-  } as BlockUpdateInput;
+// Preview Component
+function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }) {
+  const socialIcons: SocialIconMap = {
+    instagram: Instagram,
+    tiktok: Music,
+    youtube: Youtube,
+    email: Mail,
+    facebook: Facebook,
+    twitter: Twitter,
+    linkedin: Linkedin,
+    github: Github,
+    telegram: Send,
+    whatsapp: MessageCircle,
+  };
+
+  const activeLinks = links
+    .filter((link) => link.isActive)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Preview</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="w-64 h-[500px] bg-black rounded-[2.5rem] p-2 mx-auto">
+          <div className="w-full h-full bg-white rounded-[2rem] overflow-hidden">
+            <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
+              <div className="text-center space-y-4">
+                <Avatar className="w-20 h-20 mx-auto">
+                  <AvatarImage
+                    src={profile?.avatar || "/placeholder.svg"}
+                    alt={profile?.displayName || profile?.username}
+                  />
+                  <AvatarFallback>
+                    {(profile?.displayName || profile?.username || "")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div>
+                  <h2 className="text-lg font-semibold text-primary">
+                    {profile?.displayName || profile?.username}
+                  </h2>
+                  {profile?.bio && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {profile.bio}
+                    </p>
+                  )}
+                  
+                  {profile?.socialLinks && Object.keys(profile.socialLinks).length > 0 && (
+                    <div className="flex justify-center gap-2 pt-2">
+                      {Object.entries(profile.socialLinks).map(([platform, url]) => {
+                        const Icon = socialIcons[platform];
+                        if (!Icon) return null;
+                        
+                        return (
+                          <Button
+                            key={platform}
+                            asChild
+                            variant="outline"
+                            size="icon"
+                            className="w-8 h-8 rounded-full border-2"
+                          >
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Icon className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  {activeLinks.map((link) => (
+                    <Button
+                      key={link.id}
+                      asChild
+                      variant="outline"
+                      className="w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                    >
+                      <a
+                        href={link.url || "#"}
+                        target={link.openInNewTab ? "_blank" : "_self"}
+                        rel={link.openInNewTab ? "noopener noreferrer" : undefined}
+                      >
+                        {link.title || "Untitled"}
+                      </a>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
+// Main Component
 export default function MicrositeStudioPage() {
   const queryClient = useQueryClient();
   const sensors = useSensors(
@@ -1085,781 +733,407 @@ export default function MicrositeStudioPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // State
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
+  const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<PendingChanges>({
+    profile: {},
+    links: {},
+    hasChanges: false,
+  });
+  const [localLinks, setLocalLinks] = useState<LinkData[]>([]);
+
   // Queries
-  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
+  const { data: profiles = [] } = useQuery({
     queryKey: ["profiles"],
     queryFn: getProfiles,
-  }) as { data: ProfileData[]; isLoading: boolean };
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
-    null
-  );
+  }) as { data: ProfileData[] };
+
+  const { data: serverLinks } = useQuery({
+    queryKey: ["links"],
+    queryFn: getLinks,
+  });
+
+  // Initialize
   useEffect(() => {
-    if (profiles.length && !selectedProfileId)
+    if (profiles.length && !selectedProfileId) {
       setSelectedProfileId(profiles[0].id);
+    }
   }, [profiles, selectedProfileId]);
 
-  const { data: allBlocks = [], isLoading: loadingBlocks } = useQuery({
-    queryKey: ["blocks"],
-    queryFn: getBlocks,
-  });
-  const blocks = useMemo(
-    () =>
-      selectedProfileId
-        ? (allBlocks as BlockData[]).filter(
-            (b: BlockData) => b.profileId === selectedProfileId
-          )
-        : [],
-    [allBlocks, selectedProfileId]
-  );
+  useEffect(() => {
+    if (serverLinks) {
+      setLocalLinks(serverLinks as LinkData[]);
+    }
+  }, [serverLinks]);
 
+  // Current data
   const currentProfile = useMemo(
-    () => profiles.find((p) => p.id === selectedProfileId) || profiles[0],
+    () => profiles?.find((p) => p.id === selectedProfileId),
     [profiles, selectedProfileId]
   );
 
-  // Mutations with optimistic updates
-  const mutateProfile = useMutation({
+  const currentLinks = useMemo(
+    () =>
+      selectedProfileId
+        ? localLinks.filter((link) => link.profileId === selectedProfileId)
+        : [],
+    [localLinks, selectedProfileId]
+  );
+
+  const orderedLinks = useMemo(
+    () => [...currentLinks].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+    [currentLinks]
+  );
+
+  // Mutations
+  const updateProfileMutation = useMutation({
     mutationFn: (payload: ProfileUpdateInput) => updateProfile(payload),
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["profiles"] });
-      const previous = queryClient.getQueryData(["profiles"]) as
-        | ProfileData[]
-        | undefined;
-      if (previous && payload?.id) {
-        const next = previous.map((p) =>
-          p.id === payload.id ? { ...p, ...payload } : p
-        );
-        queryClient.setQueryData(["profiles"], next);
-      }
-      return { previous };
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profiles"] });
     },
-    onError: (_err, _payload, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["profiles"], ctx.previous);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["profiles"] }),
   });
 
-  const mutateBlock = useMutation({
-    mutationFn: (payload: BlockUpdateInput) => updateBlock(payload),
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["blocks"] });
-      const previous = queryClient.getQueryData(["blocks"]) as
-        | BlockData[]
-        | undefined;
-      if (previous && payload?.id) {
-        const next = previous.map((b) =>
-          b.id === payload.id ? { ...b, ...payload } : b
-        );
-        queryClient.setQueryData(["blocks"], next);
-      }
-      return { previous };
+  const updateLinkMutation = useMutation({
+    mutationFn: (payload: LinkUpdateInput) => updateLink(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links"] });
     },
-    onError: (_err, _payload, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
 
-  const mutateCreateBlock = useMutation({
-    mutationFn: (payload: BlockCreateInput) => createBlock(payload),
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["blocks"] });
-      const previous = queryClient.getQueryData(["blocks"]) as
-        | BlockData[]
-        | undefined;
-      if (previous) {
-        const temp = { ...payload, id: `temp-${Date.now()}` } as BlockData;
-        queryClient.setQueryData(["blocks"], [...previous, temp]);
-      }
-      return { previous };
+  const createLinkMutation = useMutation({
+    mutationFn: (payload: LinkCreateInput) => createLink(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links"] });
     },
-    onError: (_err, _payload, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
 
-  const mutateDeleteBlock = useMutation({
-    mutationFn: (id: string) => deleteBlock(id),
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["blocks"] });
-      const previous = queryClient.getQueryData(["blocks"]) as
-        | BlockData[]
-        | undefined;
-      if (previous)
-        queryClient.setQueryData(
-          ["blocks"],
-          previous.filter((b) => b.id !== id)
-        );
-      return { previous };
+  const deleteLinkMutation = useMutation({
+    mutationFn: (id: string) => deleteLink(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links"] });
     },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["blocks"], ctx.previous);
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["blocks"] }),
   });
 
-  // Pending updates queue to avoid too many posts
-  const [pendingBlockUpdates, setPendingBlockUpdates] = useState<
-    Record<string, Partial<BlockData>>
-  >({});
-  const [isSaving, setIsSaving] = useState(false);
-
-  function applyBlockUpdateLocal(
-    block: BlockData,
-    updates: Partial<BlockData>
-  ) {
-    // update local cache for instant UX
-    queryClient.setQueryData(["blocks"], (prev: BlockData[] | undefined) => {
-      if (!prev) return prev;
-      return prev.map((b) =>
-        b.id === block.id
-          ? {
-              ...b,
-              ...updates,
-              config: updates.config
-                ? {
-                    ...(b.config || {}),
-                    ...(updates.config as Record<string, unknown>),
-                  }
-                : b.config,
-            }
-          : b
-      );
-    });
-    // queue pending
-    setPendingBlockUpdates((prev) => ({
+  // Handlers
+  const handleProfileUpdate = useCallback((updates: Partial<ProfileData>) => {
+    setPendingChanges(prev => ({
       ...prev,
-      [block.id]: {
-        ...(prev[block.id] || {}),
-        ...updates,
-        config: updates.config
-          ? {
-              ...(prev[block.id]?.config || {}),
-              ...(updates.config as Record<string, unknown>),
-            }
-          : (prev[block.id]?.config as Record<string, unknown>),
-      },
+      profile: { ...prev.profile, ...updates },
+      hasChanges: true,
     }));
-  }
+  }, []);
 
-  async function saveOneBlock(blockId: string) {
-    const pending = pendingBlockUpdates[blockId];
-    if (!pending) return;
-    const current = (
-      queryClient.getQueryData(["blocks"]) as BlockData[] | undefined
-    )?.find((b) => b.id === blockId);
-    if (!current) return;
-    const payload = buildBlockUpdatePayload(current, pending);
-    if (payload.type === "product" || payload.type === "affiliate")
-      payload.url = undefined;
-    await mutateBlock.mutateAsync(payload);
-    setPendingBlockUpdates((prev) => {
-      const next = { ...prev };
-      delete next[blockId];
-      return next;
-    });
-  }
-
-  async function saveAllPending() {
-    const ids = Object.keys(pendingBlockUpdates);
-    if (!ids.length) return;
-    setIsSaving(true);
-    for (const id of ids) {
-      await saveOneBlock(id);
-    }
-    setIsSaving(false);
-  }
-
-  // DnD
-  const [orderedIds, setOrderedIds] = useState<string[]>([]);
-  useEffect(() => {
-    const nextIds = [...blocks]
-      .sort(
-        (a: BlockData, b: BlockData) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+  const handleLinkUpdate = useCallback((linkId: string, updates: Partial<LinkData>) => {
+    // Update local state immediately
+    setLocalLinks(prev =>
+      prev.map(link =>
+        link.id === linkId ? { ...link, ...updates } : link
       )
-      .map((l: BlockData) => l.id);
-    setOrderedIds((prev) => {
-      if (
-        prev.length === nextIds.length &&
-        prev.every((id, i) => id === nextIds[i])
-      ) {
-        return prev;
-      }
-      return nextIds;
-    });
-  }, [blocks]);
+    );
 
-  async function onDragEnd(event: DragEndEvent) {
+    // Track pending changes
+    setPendingChanges(prev => ({
+      ...prev,
+      links: {
+        ...prev.links,
+        [linkId]: { ...prev.links[linkId], ...updates },
+      },
+      hasChanges: true,
+    }));
+  }, []);
+
+  const handleLinkDelete = (linkId: string) => {
+    setLocalLinks(prev => prev.filter(link => link.id !== linkId));
+    deleteLinkMutation.mutate(linkId);
+    
+    // Remove from pending changes
+    setPendingChanges(prev => {
+      const newLinks = { ...prev.links };
+      delete newLinks[linkId];
+      return {
+        ...prev,
+        links: newLinks,
+      };
+    });
+    
+    toast.success("Link deleted");
+  };
+
+  const handleAddLink = (data: { title: string; url: string }) => {
+    if (!selectedProfileId) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const newLink: LinkData = {
+      id: tempId,
+      profileId: selectedProfileId,
+      title: data.title,
+      url: data.url,
+      isActive: true,
+      openInNewTab: true,
+      sortOrder: currentLinks.length,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Add to local state immediately
+    setLocalLinks(prev => [...prev, newLink]);
+
+    // Create on server
+    const payload: LinkCreateInput = {
+      profileId: selectedProfileId,
+      title: data.title,
+      url: data.url,
+      sortOrder: currentLinks.length,
+      isActive: true,
+    };
+
+    createLinkMutation.mutate(payload, {
+      onSuccess: (createdLink) => {
+        // Replace temp link with real one
+        setLocalLinks(prev =>
+          prev.map(link =>
+            link.id === tempId ? createdLink as LinkData : link
+          )
+        );
+        toast.success("Link added");
+      },
+      onError: () => {
+        // Remove temp link on error
+        setLocalLinks(prev => prev.filter(link => link.id !== tempId));
+        toast.error("Failed to add link");
+      },
+    });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setOrderedIds((ids) => {
-      const oldIndex = ids.indexOf(String(active.id));
-      const newIndex = ids.indexOf(String(over.id));
-      const next = arrayMove(ids, oldIndex, newIndex);
-      // update local order and queue pending
-      next.forEach((id, idx) => {
-        const block = blocks.find((l: BlockData) => l.id === id);
-        if (block && block.sortOrder !== idx) {
-          applyBlockUpdateLocal(block, { sortOrder: idx });
+
+    const oldIndex = orderedLinks.findIndex(link => link.id === active.id);
+    const newIndex = orderedLinks.findIndex(link => link.id === over.id);
+    const newOrder = arrayMove(orderedLinks, oldIndex, newIndex);
+
+    // Update local state immediately
+    newOrder.forEach((link, index) => {
+      handleLinkUpdate(link.id, { sortOrder: index });
+    });
+  };
+
+  const handleSaveAll = async () => {
+    try {
+      const promises: Promise<unknown>[] = [];
+
+      // Save profile changes
+      if (Object.keys(pendingChanges.profile).length > 0 && currentProfile) {
+        // Filter social links to only include supported platforms and valid URLs
+        const socialLinks = pendingChanges.profile.socialLinks ?? currentProfile.socialLinks;
+        const validSocialLinks: Record<string, string> = {};
+        
+        if (socialLinks) {
+          const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook', 'telegram', 'whatsapp', 'email', 'github'];
+          
+          Object.entries(socialLinks).forEach(([platform, url]) => {
+            if (supportedPlatforms.includes(platform) && url && url.trim()) {
+              validSocialLinks[platform] = url.trim();
+            }
+          });
+        }
+        
+        // Helper function to clean URL values
+        const cleanUrl = (url: string | undefined | null): string | undefined => {
+          if (!url || url.trim() === '') return undefined;
+          const trimmed = url.trim();
+          // Basic URL validation
+          try {
+            new URL(trimmed);
+            return trimmed;
+          } catch {
+            return undefined;
+          }
+        };
+        
+        const profilePayload: ProfileUpdateInput = {
+          id: currentProfile.id,
+          username: currentProfile.username,
+          displayName: (pendingChanges.profile.displayName ?? currentProfile.displayName) || currentProfile.username,
+          bio: pendingChanges.profile.bio ?? currentProfile.bio,
+          avatar: cleanUrl(currentProfile.avatar),
+          backgroundImage: cleanUrl(currentProfile.backgroundImage),
+          isPublic: currentProfile.isPublic,
+          socialLinks: Object.keys(validSocialLinks).length > 0 ? validSocialLinks : undefined,
+        };
+        promises.push(updateProfileMutation.mutateAsync(profilePayload));
+      }
+
+      // Save link changes
+      Object.entries(pendingChanges.links).forEach(([linkId, updates]) => {
+        const link = currentLinks.find(l => l.id === linkId);
+        if (link) {
+          const linkPayload: LinkUpdateInput = {
+            id: linkId,
+            profileId: link.profileId,
+            title: updates.title ?? link.title,
+            url: updates.url ?? link.url,
+            isActive: updates.isActive ?? link.isActive,
+            sortOrder: updates.sortOrder ?? link.sortOrder,
+          };
+          promises.push(updateLinkMutation.mutateAsync(linkPayload));
         }
       });
-      return next;
-    });
+
+      await Promise.all(promises);
+
+      setPendingChanges({
+        profile: {},
+        links: {},
+        hasChanges: false,
+      });
+
+      toast.success("All changes saved!");
+    } catch (error) {
+      console.error("Failed to save changes:", error);
+      
+      // Extract more specific error message
+      let errorMessage = "Failed to save some changes";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'response' in error) {
+        const response = (error as any).response;
+        if (response?.data?.error) {
+          errorMessage = response.data.error;
+        } else if (response?.status === 400) {
+          errorMessage = "Validation error: Please check your input data";
+        }
+      }
+      
+      toast.error(errorMessage);
+    }
+  };
+
+  if (!currentProfile) {
+    return <div className="p-6">Loading...</div>;
   }
 
-  // Add block dialog with type selector
-  const addForm = useForm<{
-    type: "link" | "text" | "separator" | "image";
-    title?: string;
-    url?: string;
-    text?: string;
-    imageUrl?: string;
-    alt?: string;
-  }>({
-    resolver: zodResolver(
-      z
-        .object({
-          type: z.enum(["link", "text", "separator", "image"]),
-          title: z.string().optional(),
-          url: z
-            .string()
-            .url("URL must include http:// or https://")
-            .optional(),
-          text: z.string().optional(),
-          imageUrl: z.string().url("Must be a valid URL").optional(),
-          alt: z.string().optional(),
-        })
-        .refine(
-          (v) => {
-            if (v.type === "link") return !!v.title && !!v.url;
-            if (v.type === "text") return !!v.text;
-            if (v.type === "image") return !!v.imageUrl;
-            return true; // separator
-          },
-          { message: "Fill required fields for selected block type" }
-        )
-    ),
-    defaultValues: { type: "link" },
-  });
-
-  const [addOpen, setAddOpen] = useState(false);
-  const isLoading = loadingProfiles || loadingBlocks;
-  const publicUrl = currentProfile?.username
-    ? `http://localhost:3000/${currentProfile.username}`
-    : "#";
+  const publicUrl = `http://localhost:3000/${currentProfile.username}`;
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold">Microsite Builder</h2>
-          {currentProfile?.username && (
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary underline"
-            >
-              {publicUrl}
-            </a>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => queryClient.invalidateQueries()}
-            disabled={isLoading}
+          <h1 className="text-2xl font-bold">Microsite Studio</h1>
+          <a
+            href={publicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary hover:underline"
           >
-            Refresh
-          </Button>
+            {publicUrl}
+          </a>
         </div>
+        
+        <Button
+          onClick={handleSaveAll}
+          disabled={!pendingChanges.hasChanges}
+          className="min-w-[140px]"
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Save All Changes
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Editor */}
+        <div className="lg:col-span-2 space-y-6">
           <ProfileSection
             profile={currentProfile}
-            onUpdate={(updates) =>
-              mutateProfile.mutate(
-                buildProfileUpdatePayload(currentProfile || {}, updates)
-              )
-            }
-            onAddSocial={(platform, value) => {
-              const prev = currentProfile?.socialLinks || {};
-              mutateProfile.mutate(
-                buildProfileUpdatePayload(currentProfile || {}, {
-                  socialLinks: { ...prev, [platform]: value },
-                })
-              );
-            }}
-            onDeleteSocial={(platform) => {
-              const prev = { ...(currentProfile?.socialLinks || {}) };
-              delete prev[platform];
-              mutateProfile.mutate(
-                buildProfileUpdatePayload(currentProfile || {}, {
-                  socialLinks: prev,
-                })
-              );
-            }}
+            onUpdate={handleProfileUpdate}
           />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Blocks</CardTitle>
-              <div className="flex items-center gap-2">
-                <Dialog open={addOpen} onOpenChange={setAddOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">Add Block</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Block</DialogTitle>
-                    </DialogHeader>
-                    <Form {...addForm}>
-                      <form
-                        onSubmit={addForm.handleSubmit(async (values) => {
-                          if (!selectedProfileId) return;
-                          const base = {
-                            profileId: selectedProfileId,
-                            sortOrder: blocks.length,
-                          };
-                          let payload: BlockCreateInput;
-                          if (values.type === "link") {
-                            payload = {
-                              ...base,
-                              type: "link",
-                              title: values.title!,
-                              url: values.url!,
-                              isActive: true,
-                              openInNewTab: true,
-                            };
-                          } else if (values.type === "text") {
-                            payload = {
-                              ...base,
-                              type: "text",
-                              title: values.title,
-                              url: undefined,
-                              config: { text: values.text },
-                            };
-                          } else if (values.type === "image") {
-                            payload = {
-                              ...base,
-                              type: "image",
-                              title: values.title,
-                              url: undefined,
-                              config: {
-                                imageUrl: values.imageUrl,
-                                alt: values.alt,
-                              },
-                            };
-                          } else {
-                            payload = {
-                              ...base,
-                              type: "separator",
-                              url: undefined,
-                            };
-                          }
-                          await mutateCreateBlock.mutateAsync(payload);
-                          addForm.reset({ type: "link" });
-                          setAddOpen(false);
-                        })}
-                        className="grid grid-cols-2 gap-3"
-                      >
-                        {/* Type selector */}
-                        <FormField
-                          name="type"
-                          control={addForm.control}
-                          render={({ field }) => (
-                            <FormItem className="col-span-2">
-                              <FormLabel>Type</FormLabel>
-                              <div className="flex gap-2">
-                                {(
-                                  [
-                                    "link",
-                                    "text",
-                                    "separator",
-                                    "image",
-                                  ] as const
-                                ).map((t) => (
-                                  <Button
-                                    key={t}
-                                    type="button"
-                                    variant={
-                                      field.value === t ? "default" : "outline"
-                                    }
-                                    onClick={() => addForm.setValue("type", t)}
-                                  >
-                                    {t}
-                                  </Button>
-                                ))}
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Conditional fields */}
-                        {addForm.watch("type") === "link" && (
-                          <>
-                            <FormField
-                              name="title"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Title</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} required />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              name="url"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>URL</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="https://..."
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-
-                        {addForm.watch("type") === "text" && (
-                          <>
-                            <FormField
-                              name="title"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Title (optional)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              name="text"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Text</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      {...field}
-                                      placeholder="Your text..."
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-
-                        {addForm.watch("type") === "image" && (
-                          <>
-                            <FormField
-                              name="title"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Title (optional)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              name="imageUrl"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Image URL</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="https://..."
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              name="alt"
-                              control={addForm.control}
-                              render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Alt text (optional)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                        )}
-
-                        <div className="col-span-2 flex items-center gap-2">
-                          <Button type="submit">Create</Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setAddOpen(false)}
-                            className="bg-transparent"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
+              <CardTitle>Links</CardTitle>
+              <Button
+                onClick={() => setAddLinkDialogOpen(true)}
+                variant="outline"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Link
+              </Button>
             </CardHeader>
             <CardContent>
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
-                onDragEnd={onDragEnd}
+                onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={orderedIds}
+                  items={orderedLinks.map(link => link.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-2">
-                    {orderedIds.map((id) => {
-                      const b = blocks.find((x: BlockData) => x.id === id);
-                      if (!b) return null;
-                      return (
-                        <BuilderLinkCard
-                          key={b.id}
-                          block={b}
-                          onUpdate={(updates) =>
-                            applyBlockUpdateLocal(b, updates)
-                          }
-                          onDelete={() => mutateDeleteBlock.mutate(b.id)}
-                          onSave={() => saveOneBlock(b.id)}
-                        />
-                      );
-                    })}
+                  <div className="space-y-3">
+                    {orderedLinks.map((link) => (
+                      <LinkCard
+                        key={link.id}
+                        link={link}
+                        onUpdate={(updates) => handleLinkUpdate(link.id, updates)}
+                        onDelete={() => handleLinkDelete(link.id)}
+                      />
+                    ))}
+                    {orderedLinks.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No links yet. Add your first link to get started!</p>
+                        <Button 
+                          onClick={() => setAddLinkDialogOpen(true)}
+                          variant="outline"
+                          className="mt-4"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Your First Link
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </SortableContext>
               </DndContext>
             </CardContent>
           </Card>
-
-          {/* Sticky Save Bar */}
-          <div className="sticky bottom-0 z-40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t mt-4 p-3 flex justify-end">
-            <Button
-              onClick={saveAllPending}
-              disabled={isSaving || !Object.keys(pendingBlockUpdates).length}
-            >
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
         </div>
 
-        {/* Preview column unchanged except rendering blocks */}
+        {/* Preview */}
         <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <div className="w-64 h-[500px] bg-black rounded-[2.5rem] p-2 mx-auto">
-                  <div className="w-full h-full bg-white rounded-[2rem] overflow-hidden relative">
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-full"></div>
-                    <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
-                      <div className="text-center space-y-4">
-                        <Avatar className="w-20 h-20 mx-auto">
-                          <AvatarImage
-                            src={currentProfile?.avatar || "/placeholder.svg"}
-                            alt={
-                              currentProfile?.displayName ||
-                              currentProfile?.username
-                            }
-                          />
-                          <AvatarFallback>
-                            {(
-                              currentProfile?.displayName ||
-                              currentProfile?.username ||
-                              ""
-                            )
-                              .charAt(0)
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h2 className="text-lg font-semibold text-primary">
-                            {currentProfile?.displayName ||
-                              currentProfile?.username}
-                          </h2>
-                          {currentProfile?.bio && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {currentProfile.bio}
-                            </p>
-                          )}
-                          {/* Social links row */}
-                          <div className="flex justify-center gap-2 pt-2">
-                            {Object.entries(
-                              currentProfile?.socialLinks || {}
-                            ).map(([platform, url]: [string, string]) => {
-                              const map: SocialIconMap = {
-                                instagram: Instagram,
-                                tiktok: Music,
-                                youtube: Youtube,
-                                email: Mail,
-                                facebook: Facebook,
-                                twitter: Twitter,
-                                linkedin: Linkedin,
-                                github: Github,
-                                telegram: Send,
-                                whatsapp: MessageCircle,
-                              };
-                              const Icon = map[platform];
-                              return (
-                                <Button
-                                  key={platform}
-                                  asChild
-                                  variant="outline"
-                                  size="icon"
-                                  className="w-8 h-8 rounded-full border-2"
-                                >
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    {Icon && <Icon className="w-4 h-4" />}
-                                  </a>
-                                </Button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          {[...blocks]
-                            .filter((l: BlockData) => l.isActive)
-                            .sort(
-                              (a: BlockData, b: BlockData) =>
-                                (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-                            )
-                            .map((block: BlockData) => {
-                              const cfg = block.config || {};
-                              if (block.type === "separator") {
-                                return (
-                                  <hr
-                                    key={block.id}
-                                    className="border-gray-200"
-                                  />
-                                );
-                              }
-                              if (block.type === "text") {
-                                return (
-                                  <div
-                                    key={block.id}
-                                    className="text-sm text-foreground"
-                                  >
-                                    {cfg.text || block.title}
-                                  </div>
-                                );
-                              }
-                              if (block.type === "image") {
-                                const src = cfg.imageUrl || cfg.thumbnail;
-                                if (!src) return null;
-                                return (
-                                  <Image
-                                    key={block.id}
-                                    src={src}
-                                    alt={cfg.alt || block.title || "image"}
-                                    className="w-full rounded-lg"
-                                    width={240}
-                                    height={160}
-                                  />
-                                );
-                              }
-                              const TablerIcon = cfg.icon
-                                ? (
-                                    Tabler as unknown as Record<
-                                      string,
-                                      React.ComponentType<{
-                                        className?: string;
-                                      }>
-                                    >
-                                  )[cfg.icon]
-                                : undefined;
-                              return (
-                                <Button
-                                  key={block.id}
-                                  asChild
-                                  variant="outline"
-                                  className="w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary bg-transparent flex items-center gap-2 justify-center"
-                                  style={{
-                                    backgroundColor:
-                                      cfg.buttonStyle?.backgroundColor ||
-                                      "transparent",
-                                    color:
-                                      cfg.buttonStyle?.textColor || "inherit",
-                                    borderRadius:
-                                      cfg.buttonStyle?.borderRadius || "9999px",
-                                  }}
-                                >
-                                  <a
-                                    href={block.url || "#"}
-                                    target={
-                                      block.openInNewTab ? "_blank" : "_self"
-                                    }
-                                    rel={
-                                      block.openInNewTab
-                                        ? "noopener noreferrer"
-                                        : undefined
-                                    }
-                                  >
-                                    <span className="inline-flex items-center gap-2">
-                                      {cfg.thumbnail && (
-                                        <Image
-                                          src={cfg.thumbnail}
-                                          alt="thumb"
-                                          className="w-5 h-5 rounded"
-                                          width={20}
-                                          height={20}
-                                        />
-                                      )}
-                                      {TablerIcon && (
-                                        <TablerIcon className="w-4 h-4" />
-                                      )}
-                                      {block.title}
-                                    </span>
-                                  </a>
-                                </Button>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Preview 
+            profile={{
+              ...currentProfile,
+              ...pendingChanges.profile,
+              displayName: pendingChanges.profile.displayName ?? currentProfile.displayName,
+              bio: pendingChanges.profile.bio ?? currentProfile.bio,
+              socialLinks: pendingChanges.profile.socialLinks ?? currentProfile.socialLinks,
+            }} 
+            links={orderedLinks} 
+          />
         </div>
       </div>
+
+      {/* Add Link Dialog */}
+      <AddLinkDialog
+        open={addLinkDialogOpen}
+        onOpenChange={setAddLinkDialogOpen}
+        onAdd={handleAddLink}
+      />
+
+      {/* Pending Changes Indicator */}
+      {pendingChanges.hasChanges && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-card border rounded-lg shadow-lg p-4 flex items-center gap-3 z-50">
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+          <span className="text-sm font-medium">You have unsaved changes</span>
+          <Button size="sm" onClick={handleSaveAll}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Now
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

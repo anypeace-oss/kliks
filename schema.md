@@ -105,6 +105,8 @@ linkedin?: string;
 facebook?: string;
 telegram?: string;
 whatsapp?: string;
+email?: string;
+github?: string;
 }>(),
 
 createdAt: timestamp("created_at")

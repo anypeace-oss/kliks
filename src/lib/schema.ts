@@ -110,6 +110,8 @@ export const profiles = pgTable("profiles", {
     facebook?: string;
     telegram?: string;
     whatsapp?: string;
+    email?: string;
+    github?: string;
   }>(),
 
   createdAt: timestamp("created_at")
@@ -121,7 +123,7 @@ export const profiles = pgTable("profiles", {
 });
 
 // Blocks/components on the profile (replaces links)
-export const blocks = pgTable("blocks", {
+export const links = pgTable("links", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
@@ -130,47 +132,11 @@ export const blocks = pgTable("blocks", {
     .references(() => profiles.id, { onDelete: "cascade" }),
 
   // Common fields
-  title: text("title"),
-  url: text("url"), // for link/product/affiliate
-  description: text("description"),
-  // Generalized type
-  type: text("type").notNull().default("link"), // link, product, affiliate, text, separator, image
-  productId: text("product_id").references(() => digitalProducts.id, {
-    onDelete: "cascade",
-  }),
-  affiliateId: text("affiliate_id").references(() => affiliates.id, {
-    onDelete: "cascade",
-  }),
-
-  // Flexible config payload
-  config: jsonb("config").$type<{
-    icon?: string;
-    thumbnail?: string;
-    buttonStyle?: {
-      backgroundColor?: string;
-      textColor?: string;
-      borderRadius?: string;
-      border?: string;
-      animation?: string;
-    };
-    text?: string;
-    imageUrl?: string;
-    alt?: string;
-    [key: string]: unknown;
-  }>(),
-
-  // Behavior
+  title: text("title").notNull(),
+  url: text("url").notNull(), // for link
   isActive: boolean("is_active").notNull().default(true),
-  openInNewTab: boolean("open_in_new_tab").notNull().default(true),
-
   // Ordering
   sortOrder: integer("sort_order").notNull().default(0),
-
-  // Advanced features
-  scheduledStart: timestamp("scheduled_start"), // jadwal tampil
-  scheduledEnd: timestamp("scheduled_end"), // jadwal berakhir
-  clickLimit: integer("click_limit"), // batasan klik
-  password: text("password"), // password protect
 
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
@@ -343,7 +309,7 @@ export const linkClicks = pgTable("link_clicks", {
     .$defaultFn(() => crypto.randomUUID()),
   linkId: text("link_id")
     .notNull()
-    .references(() => blocks.id, { onDelete: "cascade" }),
+    .references(() => links.id, { onDelete: "cascade" }),
 
   // Visitor info
   ipAddress: text("ip_address"),
@@ -646,7 +612,7 @@ export const profileRelations = {
   },
   blocks: {
     relation: "one-to-many",
-    table: blocks,
+    table: links,
     reference: "profileId",
   },
 };

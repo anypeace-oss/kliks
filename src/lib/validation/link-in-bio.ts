@@ -11,11 +11,17 @@ export const DecimalString = z
 
 export const UrlString = z.string().url({ message: "Must be a valid URL" });
 export const OptionalUrlString = z
-  .string()
-  .url()
+  .union([
+    z.string().url({ message: "Must be a valid URL" }),
+    z.literal(""),
+    z.null(),
+    z.undefined()
+  ])
   .optional()
-  .or(z.literal(""))
-  .transform((v) => (v === "" ? undefined : v));
+  .transform((v) => {
+    if (v === "" || v === null || v === undefined) return undefined;
+    return v;
+  });
 
 export const DateValue = z.coerce.date();
 export const OptionalDateValue = z.coerce.date().optional();
@@ -42,6 +48,8 @@ export const ProfileCreateSchema = z.object({
       facebook: z.string().optional(),
       telegram: z.string().optional(),
       whatsapp: z.string().optional(),
+      email: z.string().optional(),
+      github: z.string().optional(),
     })
     .partial()
     .optional(),
@@ -53,7 +61,7 @@ export const ProfileUpdateSchema = ProfileCreateSchema.extend({
   id: z.string(),
 });
 
-// ===== Blocks (replaces Links) =====
+// ===== Links (replaces Blocks) =====
 const ButtonStyleSchema = z
   .object({
     backgroundColor: z.string().optional(),
@@ -64,55 +72,23 @@ const ButtonStyleSchema = z
   })
   .partial();
 
-const BlockConfigSchema = z
+const LinkConfigSchema = z
   .object({
     icon: z.string().optional(),
     thumbnail: OptionalUrlString,
     buttonStyle: ButtonStyleSchema.optional(),
-    text: z.string().optional(),
-    imageUrl: OptionalUrlString,
-    alt: z.string().optional(),
   })
   .partial();
 
-export const BlockCreateSchema = z
-  .object({
-    profileId: z.string(),
-    title: z.string().min(1).optional(),
-    url: OptionalUrlString,
-    description: z.string().optional(),
-    type: z
-      .enum(["link", "product", "affiliate", "text", "separator", "image"]) // generalized
-      .optional()
-      .default("link"),
-    productId: z.string().optional(),
-    affiliateId: z.string().optional(),
-    config: BlockConfigSchema.optional(),
-    isActive: z.boolean().optional(),
-    openInNewTab: z.boolean().optional(),
-    sortOrder: z.number().int().optional(),
-    scheduledStart: OptionalDateValue,
-    scheduledEnd: OptionalDateValue,
-    clickLimit: z.number().int().positive().optional(),
-    password: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.type === "link") return !!data.url;
-      if (data.type === "product") return !!data.productId;
-      if (data.type === "affiliate") return !!data.affiliateId;
-      if (data.type === "text") return !!data.config?.text;
-      if (data.type === "image") return !!data.config?.imageUrl;
-      if (data.type === "separator") return true;
-      return true;
-    },
-    {
-      message:
-        "link requires url, product requires productId, affiliate requires affiliateId, text requires config.text, image requires config.imageUrl",
-    }
-  );
+export const LinkCreateSchema = z.object({
+  profileId: z.string(),
+  title: z.string().min(1),
+  url: UrlString,
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
 
-export const BlockUpdateSchema = BlockCreateSchema.extend({
+export const LinkUpdateSchema = LinkCreateSchema.extend({
   id: z.string(),
 });
 
@@ -316,8 +292,8 @@ export const LinkClickCreateSchema = z.object({
 // Re-export types for frontend usage
 export type ProfileCreateInput = z.infer<typeof ProfileCreateSchema>;
 export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
-export type BlockCreateInput = z.infer<typeof BlockCreateSchema>;
-export type BlockUpdateInput = z.infer<typeof BlockUpdateSchema>;
+export type LinkCreateInput = z.infer<typeof LinkCreateSchema>;
+export type LinkUpdateInput = z.infer<typeof LinkUpdateSchema>;
 export type ProductCreateInput = z.infer<typeof ProductCreateSchema>;
 export type ProductUpdateInput = z.infer<typeof ProductUpdateSchema>;
 export type ProductCategoryCreateInput = z.infer<

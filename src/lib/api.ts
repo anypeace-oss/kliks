@@ -2,8 +2,8 @@ import axios from "axios";
 import type {
   ProfileCreateInput,
   ProfileUpdateInput,
-  BlockCreateInput,
-  BlockUpdateInput,
+  LinkCreateInput,
+  LinkUpdateInput,
   ProductCategoryCreateInput,
   ProductCategoryUpdateInput,
   ProductCreateInput,
@@ -70,25 +70,25 @@ export async function getColorSchemes() {
   return (res.data?.colorSchemes ?? []) as unknown[];
 }
 
-// ===== Blocks =====
-export async function getBlocks() {
-  const res = await api.get("/api/link-in-bio/blocks");
+// ===== Links =====
+export async function getLinks() {
+  const res = await api.get("/api/link-in-bio/links");
   return res.data as unknown[];
 }
 
-export async function createBlock(input: BlockCreateInput) {
-  const res = await api.post("/api/link-in-bio/blocks", input);
+export async function createLink(input: LinkCreateInput) {
+  const res = await api.post("/api/link-in-bio/links", input);
   return res.data as unknown;
 }
 
-export async function updateBlock(input: BlockUpdateInput) {
-  const res = await api.put("/api/link-in-bio/blocks", input);
+export async function updateLink(input: LinkUpdateInput) {
+  const res = await api.put("/api/link-in-bio/links", input);
   return res.data as unknown;
 }
 
-export async function deleteBlock(id: string) {
+export async function deleteLink(id: string) {
   const res = await api.delete(
-    `/api/link-in-bio/blocks?id=${encodeURIComponent(id)}`
+    `/api/link-in-bio/links?id=${encodeURIComponent(id)}`
   );
   return res.data as unknown;
 }
