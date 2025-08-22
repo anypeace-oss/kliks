@@ -10,6 +10,7 @@ import {
   getProfiles,
   updateLink,
   updateProfile,
+  checkUsernameAvailability,
 } from "@/lib/api";
 import type {
   LinkCreateInput,
@@ -66,9 +67,19 @@ import {
   Send,
   MessageCircle,
   Save,
+  Copy,
+  Settings,
+  ExternalLink,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+
+// Design components
+import { LayoutSelector } from "./components/LayoutSelector";
+import { ThemeSelector } from "./components/ThemeSelector";
+import { ButtonVariantSelector } from "./components/ButtonVariantSelector";
 
 // Types
 interface ProfileData {
@@ -86,6 +97,10 @@ interface ProfileData {
   socialLinks?: Record<string, string>;
   seoTitle?: string;
   seoDescription?: string;
+  // Design variant fields
+  layoutVariant?: "default" | "store";
+  schemeVariant?: "theme1" | "theme2";
+  buttonVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 }
 
 interface LinkData {
@@ -118,11 +133,18 @@ interface ApiErrorResponse {
   };
 }
 
+// Design-related types
+type ButtonVariant = "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+
 // Validation schemas
 const ProfileSchema = z.object({
   displayName: z.string().min(1, "Display name is required"),
   bio: z.string().optional(),
   socialLinks: z.record(z.string(), z.string()).optional(),
+  // Design variant fields
+  layoutVariant: z.enum(["default", "store"]).optional().default("default"),
+  schemeVariant: z.enum(["theme1", "theme2"]).optional().default("theme1"),
+  buttonVariant: z.enum(["default", "destructive", "outline", "secondary", "ghost", "link"]).optional().default("default"),
 });
 
 const LinkSchema = z.object({
@@ -135,15 +157,27 @@ const LinkSchema = z.object({
 // Profile Section Component
 function ProfileSection({
   profile,
+  pendingProfile,
   onUpdate,
+  onUsernameUpdate,
 }: {
   profile: ProfileData;
+  pendingProfile: Partial<ProfileData>;
   onUpdate: (updates: Partial<ProfileData>) => void;
+  onUsernameUpdate: (newUsername: string) => Promise<boolean>;
 }) {
   const [socialDialogOpen, setSocialDialogOpen] = useState(false);
+  const [usernameDialogOpen, setUsernameDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [urlValue, setUrlValue] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [confirmationText, setConfirmationText] = useState("");
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
 
   const form = useForm({
     resolver: zodResolver(ProfileSchema),
@@ -151,6 +185,9 @@ function ProfileSection({
       displayName: profile?.displayName || profile?.username || "",
       bio: profile?.bio || "",
       socialLinks: profile?.socialLinks || {},
+      layoutVariant: profile?.layoutVariant || "default",
+      schemeVariant: profile?.schemeVariant || "theme1",
+      buttonVariant: profile?.buttonVariant || "default",
     },
   });
 
@@ -162,7 +199,17 @@ function ProfileSection({
     displayName: string;
     bio: string;
     socialLinks: Record<string, string>;
-  }>({ displayName: "", bio: "", socialLinks: {} });
+    layoutVariant: "default" | "store";
+    schemeVariant: "theme1" | "theme2";
+    buttonVariant: ButtonVariant;
+  }>({ 
+    displayName: "", 
+    bio: "", 
+    socialLinks: {},
+    layoutVariant: "default",
+    schemeVariant: "theme1",
+    buttonVariant: "default"
+  });
 
   // Real-time updates
   useEffect(() => {
@@ -171,6 +218,9 @@ function ProfileSection({
         displayName: profile.displayName || profile.username || "",
         bio: profile.bio || "",
         socialLinks: profile.socialLinks || {},
+        layoutVariant: profile.layoutVariant || "default",
+        schemeVariant: profile.schemeVariant || "theme1",
+        buttonVariant: profile.buttonVariant || "default",
       };
 
       form.reset(newValues);
@@ -185,6 +235,9 @@ function ProfileSection({
       bio: formData.bio,
       socialLinks:
         (formData.socialLinks as Record<string, string> | undefined) || {},
+      layoutVariant: (formData.layoutVariant as "default" | "store") || "default",
+      schemeVariant: (formData.schemeVariant as "theme1" | "theme2") || "theme1",
+      buttonVariant: (formData.buttonVariant as ButtonVariant) || "default",
     };
 
     const initial = initialValuesRef.current;
@@ -194,12 +247,15 @@ function ProfileSection({
       current.displayName !== initial.displayName ||
       current.bio !== initial.bio ||
       JSON.stringify(current.socialLinks) !==
-        JSON.stringify(initial.socialLinks);
+        JSON.stringify(initial.socialLinks) ||
+      current.layoutVariant !== initial.layoutVariant ||
+      current.schemeVariant !== initial.schemeVariant ||
+      current.buttonVariant !== initial.buttonVariant;
 
     if (hasChanged) {
       onUpdate(current);
     }
-  }, [formData.displayName, formData.bio, formData.socialLinks, onUpdate]);
+  }, [formData.displayName, formData.bio, formData.socialLinks, formData.layoutVariant, formData.schemeVariant, formData.buttonVariant, onUpdate]);
 
   const socialPlatforms = [
     { id: "instagram", label: "Instagram" },
@@ -230,6 +286,85 @@ function ProfileSection({
   const filteredPlatforms = socialPlatforms.filter((p) =>
     p.label.toLowerCase().includes(search.toLowerCase())
   );
+
+  const currentUrl = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/${profile?.username}`;
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setCopySuccess(true);
+      toast.success("Link copied to clipboard!");
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      toast.error("Failed to copy link");
+    }
+  };
+
+  // Debounced username validation
+  useEffect(() => {
+    if (!newUsername.trim() || newUsername.trim() === profile?.username) {
+      setUsernameError("");
+      setUsernameAvailable(null);
+      return;
+    }
+
+    if (newUsername.trim().length < 3) {
+      setUsernameError("Username must be at least 3 characters");
+      setUsernameAvailable(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsCheckingUsername(true);
+      setUsernameError("");
+      
+      try {
+        const result = await checkUsernameAvailability(newUsername.trim(), profile?.id);
+        
+        if (result.available) {
+          setUsernameAvailable(true);
+          setUsernameError("");
+        } else {
+          setUsernameAvailable(false);
+          setUsernameError("Username is already taken");
+        }
+      } catch (error) {
+        console.error("Error checking username:", error);
+        setUsernameError("Failed to check username availability");
+        setUsernameAvailable(false);
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [newUsername, profile?.username, profile?.id]);
+
+  const handleUsernameSubmit = async () => {
+    if (!newUsername.trim() || !usernameAvailable || confirmationText !== "YAKIN") {
+      return;
+    }
+
+    setIsUpdatingUsername(true);
+
+    try {
+      const success = await onUsernameUpdate(newUsername.trim());
+      
+      if (success) {
+        setUsernameDialogOpen(false);
+        setNewUsername("");
+        setConfirmationText("");
+        setUsernameError("");
+        setUsernameAvailable(null);
+      }
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handlePublicToggle = (isPublic: boolean) => {
+    onUpdate({ isPublic });
+  };
 
   const addSocial = () => {
     const trimmedUrl = urlValue.trim();
@@ -280,10 +415,76 @@ function ProfileSection({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Profile</CardTitle>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* URL Management Section */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4 bg-muted/30 rounded-lg p-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <span>My Lynkid:</span>
+                <div className="flex items-center gap-1">
+                  {(pendingProfile.isPublic ?? profile?.isPublic) ? (
+                    <Eye className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <EyeOff className="w-4 h-4 text-orange-600" />
+                  )}
+                  <span className={(pendingProfile.isPublic ?? profile?.isPublic) ? "text-green-600" : "text-orange-600"}>
+                    {(pendingProfile.isPublic ?? profile?.isPublic) ? "Public" : "Private"}
+                  </span>
+                </div>
+              </div>
+              <div className="font-mono text-sm truncate">
+                {currentUrl}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyToClipboard}
+                className="gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                {copySuccess ? "Copied!" : "Share"}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setNewUsername(profile?.username || "");
+                  setConfirmationText("");
+                  setUsernameError("");
+                  setUsernameAvailable(null);
+                  setUsernameDialogOpen(true);
+                }}
+                className="gap-2"
+              >
+                <Settings className="w-4 h-4" />
+                Customize URL
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Profile Details */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Profile</CardTitle>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="isPublic" className="text-sm font-medium">
+                Public Profile
+              </Label>
+              <Switch
+                id="isPublic"
+                checked={pendingProfile.isPublic ?? profile?.isPublic ?? true}
+                onCheckedChange={handlePublicToggle}
+              />
+            </div>
+          </div>
+        </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-4">
           <Avatar className="w-16 h-16">
@@ -432,6 +633,145 @@ function ProfileSection({
               </Dialog>
             </div>
           </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Username Customization Dialog */}
+    <Dialog open={usernameDialogOpen} onOpenChange={setUsernameDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Customize Your URL</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="username">Username</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-muted-foreground flex-shrink-0">
+                {typeof window !== 'undefined' ? window.location.origin : 'localhost:3000'}/
+              </span>
+              <Input
+                id="username"
+                value={newUsername}
+                onChange={(e) => {
+                  setNewUsername(e.target.value);
+                }}
+                placeholder="your-username"
+                className="flex-1"
+                autoFocus
+              />
+            </div>
+            <div className="mt-1 min-h-[20px]">
+              {isCheckingUsername && (
+                <p className="text-sm text-muted-foreground">Checking availability...</p>
+              )}
+              {usernameError && (
+                <p className="text-sm text-destructive">{usernameError}</p>
+              )}
+              {usernameAvailable === true && newUsername.trim() !== profile?.username && (
+                <p className="text-sm text-green-600">✓ Username is available</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Confirmation Field */}
+          {usernameAvailable && newUsername.trim() !== profile?.username && (
+            <div>
+              <Label htmlFor="confirmation">Type "YAKIN" to confirm</Label>
+              <Input
+                id="confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder="YAKIN"
+                className="mt-1"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                This action will change your profile URL permanently.
+              </p>
+            </div>
+          )}
+          
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUsernameDialogOpen(false);
+                setNewUsername("");
+                setConfirmationText("");
+                setUsernameError("");
+                setUsernameAvailable(null);
+              }}
+              disabled={isUpdatingUsername}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUsernameSubmit}
+              disabled={
+                isUpdatingUsername ||
+                !usernameAvailable ||
+                confirmationText !== "YAKIN" ||
+                newUsername.trim() === profile?.username
+              }
+            >
+              {isUpdatingUsername ? "Updating..." : "Save"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>
+);
+}
+
+// Design Section Component
+function DesignSection({
+  profile,
+  pendingProfile,
+  onUpdate,
+}: {
+  profile: ProfileData;
+  pendingProfile: Partial<ProfileData>;
+  onUpdate: (updates: Partial<ProfileData>) => void;
+}) {
+  // Use pending changes first, then fallback to profile, then defaults
+  const layoutVariant = pendingProfile?.layoutVariant ?? profile?.layoutVariant ?? "default";
+  const schemeVariant = pendingProfile?.schemeVariant ?? profile?.schemeVariant ?? "theme1";
+  const buttonVariant = pendingProfile?.buttonVariant ?? profile?.buttonVariant ?? "default";
+
+  const handleLayoutChange = (value: "default" | "store") => {
+    onUpdate({ layoutVariant: value });
+  };
+
+  const handleThemeChange = (value: "theme1" | "theme2") => {
+    onUpdate({ schemeVariant: value });
+  };
+
+  const handleButtonVariantChange = (value: ButtonVariant) => {
+    onUpdate({ buttonVariant: value });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Design Settings</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <LayoutSelector
+            value={layoutVariant}
+            onValueChange={handleLayoutChange}
+          />
+          
+          <ThemeSelector
+            value={schemeVariant}
+            onValueChange={handleThemeChange}
+          />
+          
+          <ButtonVariantSelector
+            value={buttonVariant}
+            onValueChange={handleButtonVariantChange}
+          />
         </div>
       </CardContent>
     </Card>
@@ -669,14 +1009,27 @@ function Preview({
     .filter((link) => link.isActive)
     .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
+  // Get design settings with defaults
+  const layoutVariant = profile?.layoutVariant || "default";
+  const schemeVariant = profile?.schemeVariant || "theme1";
+  const buttonVariant = profile?.buttonVariant || "default";
+
+  // Theme classes based on schemeVariant
+  const themeClasses = schemeVariant === "theme1" 
+    ? "bg-white text-black font-mono" 
+    : "bg-white text-blue-900 font-sans";
+
+  // Layout classes based on layoutVariant
+  const isStoreLayout = layoutVariant === "store";
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Preview</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="w-64 h-[500px] border-4 border-foreground  rounded-[2.5rem] p-2 mx-auto">
-          <div className="w-full h-full  rounded-[2rem] overflow-hidden">
+        <div className="w-64 h-[500px] border-4 border-foreground rounded-[2.5rem] p-2 mx-auto">
+          <div className={`w-full h-full rounded-[2rem] overflow-hidden ${themeClasses}`}>
             <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
               <div className="text-center space-y-4">
                 <Avatar className="w-20 h-20 mx-auto">
@@ -733,20 +1086,30 @@ function Preview({
                     )}
                 </div>
 
-                <div className="space-y-3">
+                <div className={isStoreLayout ? "grid grid-cols-2 gap-2" : "space-y-3"}>
                   {activeLinks.map((link) => (
                     <Button
                       key={link.id}
                       asChild
-                      variant="outline"
-                      className="w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                      variant={buttonVariant as any}
+                      className={isStoreLayout 
+                        ? "h-16 text-xs flex flex-col p-2" 
+                        : "w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                      }
                     >
                       <a
                         href={link.url || "#"}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {link.title || "Untitled"}
+                        {isStoreLayout ? (
+                          <>
+                            <span className="font-medium truncate w-full">{link.title || "Untitled"}</span>
+                            <span className="text-xs opacity-70">Click here</span>
+                          </>
+                        ) : (
+                          link.title || "Untitled"
+                        )}
                       </a>
                     </Button>
                   ))}
@@ -754,6 +1117,18 @@ function Preview({
               </div>
             </div>
           </div>
+        </div>
+        
+        <div className="mt-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Layout: <span className="font-medium capitalize">{layoutVariant}</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Theme: <span className="font-medium capitalize">{schemeVariant}</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Buttons: <span className="font-medium capitalize">{buttonVariant}</span>
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -823,30 +1198,53 @@ export default function MicrositeStudioPage() {
   );
 
   // Mutations
-  const updateProfileMutation = useMutation({
-    mutationFn: (payload: ProfileUpdateInput) => updateProfile(payload),
-    onSuccess: () => {
+  const updateProfileMutation = useMutation<ProfileData, Error, ProfileUpdateInput>({
+    mutationFn: async (payload: ProfileUpdateInput) => updateProfile(payload) as Promise<ProfileData>,
+    onSuccess: (updatedProfile: ProfileData) => {
+      // Immediately update the profiles query data to prevent UI reversion
+      queryClient.setQueryData(["profiles"], (oldProfiles: ProfileData[] | undefined) => {
+        if (!oldProfiles) return oldProfiles;
+        return oldProfiles.map(profile => 
+          profile.id === updatedProfile.id ? { ...profile, ...updatedProfile } : profile
+        );
+      });
       queryClient.invalidateQueries({ queryKey: ["profiles"] });
     },
   });
 
-  const updateLinkMutation = useMutation({
-    mutationFn: (payload: LinkUpdateInput) => updateLink(payload),
-    onSuccess: () => {
+  const updateLinkMutation = useMutation<LinkData, Error, LinkUpdateInput>({
+    mutationFn: async (payload: LinkUpdateInput) => updateLink(payload) as Promise<LinkData>,
+    onSuccess: (updatedLink: LinkData) => {
+      // Immediately update the links query data
+      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
+        if (!oldLinks) return oldLinks;
+        return oldLinks.map(link => 
+          link.id === updatedLink.id ? { ...link, ...updatedLink } : link
+        );
+      });
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
 
-  const createLinkMutation = useMutation({
-    mutationFn: (payload: LinkCreateInput) => createLink(payload),
-    onSuccess: () => {
+  const createLinkMutation = useMutation<LinkData, Error, LinkCreateInput>({
+    mutationFn: async (payload: LinkCreateInput) => createLink(payload) as Promise<LinkData>,
+    onSuccess: (createdLink: LinkData) => {
+      // Immediately update the links query data
+      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
+        return [...(oldLinks || []), createdLink];
+      });
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
 
-  const deleteLinkMutation = useMutation({
-    mutationFn: (id: string) => deleteLink(id),
-    onSuccess: () => {
+  const deleteLinkMutation = useMutation<void, Error, string>({
+    mutationFn: async (id: string) => deleteLink(id) as Promise<void>,
+    onSuccess: (_, deletedId) => {
+      // Immediately update the links query data
+      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
+        if (!oldLinks) return oldLinks;
+        return oldLinks.filter(link => link.id !== deletedId);
+      });
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
@@ -859,6 +1257,33 @@ export default function MicrositeStudioPage() {
       hasChanges: true,
     }));
   }, []);
+
+  const handleUsernameUpdate = useCallback(async (newUsername: string): Promise<boolean> => {
+    if (!currentProfile) return false;
+
+    try {
+      const payload = {
+        id: currentProfile.id,
+        username: newUsername.trim(),
+        displayName: currentProfile.displayName,
+        bio: currentProfile.bio,
+        avatar: currentProfile.avatar,
+        isPublic: currentProfile.isPublic,
+        socialLinks: currentProfile.socialLinks,
+        layoutVariant: currentProfile.layoutVariant ?? "default",
+        schemeVariant: currentProfile.schemeVariant ?? "theme1",
+        buttonVariant: currentProfile.buttonVariant ?? "default",
+      };
+
+      await updateProfileMutation.mutateAsync(payload);
+      toast.success("Username updated successfully!");
+      return true;
+    } catch (error) {
+      console.error("Error updating username:", error);
+      toast.error("Failed to update username");
+      return false;
+    }
+  }, [currentProfile, updateProfileMutation]);
 
   const handleLinkUpdate = useCallback(
     (linkId: string, updates: Partial<LinkData>) => {
@@ -1014,11 +1439,15 @@ export default function MicrositeStudioPage() {
             currentProfile.username,
           bio: pendingChanges.profile.bio ?? currentProfile.bio,
           avatar: cleanUrl(currentProfile.avatar),
-          isPublic: currentProfile.isPublic,
+          isPublic: pendingChanges.profile.isPublic ?? currentProfile.isPublic,
           socialLinks:
             Object.keys(validSocialLinks).length > 0
               ? validSocialLinks
               : undefined,
+          // Include design variant fields
+          layoutVariant: pendingChanges.profile.layoutVariant ?? currentProfile.layoutVariant ?? "default",
+          schemeVariant: pendingChanges.profile.schemeVariant ?? currentProfile.schemeVariant ?? "theme1",
+          buttonVariant: pendingChanges.profile.buttonVariant ?? currentProfile.buttonVariant ?? "default",
         };
         promises.push(updateProfileMutation.mutateAsync(profilePayload));
       }
@@ -1041,6 +1470,10 @@ export default function MicrositeStudioPage() {
 
       await Promise.all(promises);
 
+      // Wait a brief moment to ensure query data has been updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Clear pending changes only after all updates are complete
       setPendingChanges({
         profile: {},
         links: {},
@@ -1109,7 +1542,9 @@ export default function MicrositeStudioPage() {
         <div className="lg:col-span-2 space-y-6">
           <ProfileSection
             profile={currentProfile}
+            pendingProfile={pendingChanges.profile}
             onUpdate={handleProfileUpdate}
+            onUsernameUpdate={handleUsernameUpdate}
           />
 
           <Card>
@@ -1162,24 +1597,47 @@ export default function MicrositeStudioPage() {
               </DndContext>
             </CardContent>
           </Card>
+
+          <DesignSection
+            profile={currentProfile}
+            pendingProfile={pendingChanges.profile}
+            onUpdate={handleProfileUpdate}
+          />
         </div>
 
         {/* Preview */}
         <div className="lg:col-span-1">
-          <Preview
-            profile={{
-              ...currentProfile,
-              ...pendingChanges.profile,
-              displayName:
-                pendingChanges.profile.displayName ??
-                currentProfile.displayName,
-              bio: pendingChanges.profile.bio ?? currentProfile.bio,
-              socialLinks:
-                pendingChanges.profile.socialLinks ??
-                currentProfile.socialLinks,
-            }}
-            links={orderedLinks}
-          />
+          <div className="sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <Preview
+              profile={{
+                ...currentProfile,
+                ...pendingChanges.profile,
+                displayName:
+                  pendingChanges.profile.displayName ??
+                  currentProfile.displayName,
+                bio: pendingChanges.profile.bio ?? currentProfile.bio,
+                isPublic:
+                  pendingChanges.profile.isPublic ??
+                  currentProfile.isPublic,
+                socialLinks:
+                  pendingChanges.profile.socialLinks ??
+                  currentProfile.socialLinks,
+                layoutVariant:
+                  pendingChanges.profile.layoutVariant ??
+                  currentProfile.layoutVariant ??
+                  "default",
+                schemeVariant:
+                  pendingChanges.profile.schemeVariant ??
+                  currentProfile.schemeVariant ??
+                  "theme1",
+                buttonVariant:
+                  pendingChanges.profile.buttonVariant ??
+                  currentProfile.buttonVariant ??
+                  "default",
+              }}
+              links={orderedLinks}
+            />
+          </div>
         </div>
       </div>
 

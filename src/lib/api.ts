@@ -50,6 +50,20 @@ export async function deleteProfile(id: string) {
   return res.data as unknown;
 }
 
+export async function checkUsernameAvailability(
+  username: string,
+  excludeId?: string
+) {
+  const params = new URLSearchParams({ username });
+  if (excludeId) {
+    params.set("excludeId", excludeId);
+  }
+  const res = await api.get(
+    `/api/link-in-bio/profiles/check-username?${params.toString()}`
+  );
+  return res.data as { available: boolean; username: string };
+}
+
 // ===== Links =====
 export async function getLinks() {
   const res = await api.get("/api/link-in-bio/links");

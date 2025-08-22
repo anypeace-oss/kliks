@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { profiles } from "@/lib/schema";
 import { getCurrentUser } from "@/lib/auth";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import {
   ProfileCreateSchema,
@@ -111,6 +111,24 @@ export async function PUT(request: Request) {
         { error: "Profile not found or unauthorized" },
         { status: 404 }
       );
+    }
+
+    // Check if username is already taken by another profile (global uniqueness)
+    if (body.username && body.username !== existingProfile[0].username) {
+      const usernameExists = await db
+        .select()
+        .from(profiles)
+        .where(and(
+          eq(profiles.username, body.username),
+          ne(profiles.id, body.id)
+        ));
+
+      if (usernameExists.length > 0) {
+        return NextResponse.json(
+          { error: "Username is already taken" },
+          { status: 400 }
+        );
+      }
     }
 
     // Update profile
