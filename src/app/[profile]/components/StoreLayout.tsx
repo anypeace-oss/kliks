@@ -13,6 +13,8 @@ import {
   Store,
 } from "lucide-react";
 import { ProfileButton } from "./ProfileButton";
+import { type VariantProps } from "class-variance-authority";
+import { buttonVariants } from "@/components/ui/button";
 
 interface ProfileData {
   id: string;
@@ -141,7 +143,7 @@ export function StoreLayout({ profile, links }: StoreLayoutProps) {
                 <div key={link.id} className="w-full">
                   <ProfileButton
                     href={link.url}
-                    variant={profile.buttonVariant as any || "default"}
+                    variant={(profile.buttonVariant as VariantProps<typeof buttonVariants>["variant"]) || "default"}
                     className="h-auto p-4 text-left"
                   >
                     <div className="w-full">

@@ -31,10 +31,6 @@ interface LinkData {
   updatedAt: Date;
 }
 
-interface SocialIconMap {
-  [key: string]: React.ComponentType<{ className?: string }>;
-}
-
 export default async function ProfilePage({
   params,
 }: {
