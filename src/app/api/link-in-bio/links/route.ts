@@ -71,15 +71,8 @@ export async function POST(request: Request) {
         profileId: body.profileId,
         title: body.title,
         url: body.url,
-        description: body.description,
-        config: body.config,
         isActive: body.isActive ?? true,
-        openInNewTab: body.openInNewTab ?? true,
         sortOrder: body.sortOrder ?? 0,
-        scheduledStart: body.scheduledStart,
-        scheduledEnd: body.scheduledEnd,
-        clickLimit: body.clickLimit,
-        password: body.password,
       })
       .returning();
 
@@ -125,15 +118,8 @@ export async function PUT(request: Request) {
       .set({
         title: body.title,
         url: body.url,
-        description: body.description,
-        config: body.config,
         isActive: body.isActive,
-        openInNewTab: body.openInNewTab,
         sortOrder: body.sortOrder,
-        scheduledStart: body.scheduledStart,
-        scheduledEnd: body.scheduledEnd,
-        clickLimit: body.clickLimit,
-        password: body.password,
         updatedAt: new Date(),
       })
       .where(eq(links.id, body.id))

@@ -66,15 +66,13 @@ export async function POST(request: Request) {
         displayName: body.displayName || body.username,
         bio: body.bio,
         avatar: body.avatar,
-        backgroundImage: body.backgroundImage,
         isPublic: body.isPublic ?? true,
-        analyticsEnabled: body.analyticsEnabled ?? true,
-        layoutTemplateId: body.layoutTemplateId,
-        colorSchemeId: body.colorSchemeId,
-        customCss: body.customCss,
         socialLinks: body.socialLinks,
         seoTitle: body.seoTitle,
         seoDescription: body.seoDescription,
+        layoutVariant: body.layoutVariant ?? "default",
+        schemeVariant: body.schemeVariant ?? "theme1",
+        buttonVariant: body.buttonVariant ?? "default",
       })
       .returning();
 
@@ -123,15 +121,13 @@ export async function PUT(request: Request) {
         displayName: body.displayName,
         bio: body.bio,
         avatar: body.avatar,
-        backgroundImage: body.backgroundImage,
         isPublic: body.isPublic,
-        analyticsEnabled: body.analyticsEnabled,
-        layoutTemplateId: body.layoutTemplateId,
-        colorSchemeId: body.colorSchemeId,
-        customCss: body.customCss,
         socialLinks: body.socialLinks,
         seoTitle: body.seoTitle,
         seoDescription: body.seoDescription,
+        layoutVariant: body.layoutVariant,
+        schemeVariant: body.schemeVariant,
+        buttonVariant: body.buttonVariant,
         updatedAt: new Date(),
       })
       .where(eq(profiles.id, body.id))

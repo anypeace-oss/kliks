@@ -79,26 +79,9 @@ export const profiles = pgTable("profiles", {
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   avatar: text("avatar"), // URL gambar
-  backgroundImage: text("background_image"), // URL background
-
-  // Template & Theme selection
-  layoutTemplateId: text("layout_template_id").references(
-    () => layoutTemplates.id,
-    {
-      onDelete: "set null",
-    }
-  ),
-  colorSchemeId: text("color_scheme_id").references(() => colorSchemes.id, {
-    onDelete: "set null",
-  }),
-  customCss: text("custom_css"), // untuk customization advanced
-
   isPublic: boolean("is_public").notNull().default(true),
   seoTitle: text("seo_title"),
   seoDescription: text("seo_description"),
-
-  // Analytics settings
-  analyticsEnabled: boolean("analytics_enabled").notNull().default(true),
 
   // Social media links
   socialLinks: jsonb("social_links").$type<{
@@ -113,6 +96,11 @@ export const profiles = pgTable("profiles", {
     email?: string;
     github?: string;
   }>(),
+
+  // Layout and theming options
+  layoutVariant: text("layout_variant").default("default"), // "default" | "store"
+  schemeVariant: text("scheme_variant").default("theme1"), // "theme1" | "theme2"
+  buttonVariant: text("button_variant").default("default"), // matches button.tsx variants
 
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
@@ -344,65 +332,6 @@ export const profileViews = pgTable("profile_views", {
   browser: text("browser"),
 
   viewedAt: timestamp("viewed_at")
-    .$defaultFn(() => new Date())
-    .notNull(),
-});
-
-// ===== TEMPLATES & THEMES =====
-
-// Layout template yang bisa dipilih user
-export const layoutTemplates = pgTable("layout_templates", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  description: text("description"),
-  preview: text("preview"), // URL screenshot template
-
-  // Template config (layout structure)
-  config: jsonb("config").$type<{
-    layout: "single-column" | "two-column" | "grid" | "masonry";
-    headerStyle: "minimal" | "centered" | "full-width";
-    buttonStyle: "rounded" | "square" | "pill" | "outlined";
-    spacing: "compact" | "normal" | "spacious";
-  }>(),
-
-  isActive: boolean("is_active").notNull().default(true),
-  isPremium: boolean("is_premium").notNull().default(false),
-  sortOrder: integer("sort_order").notNull().default(0),
-
-  createdAt: timestamp("created_at")
-    .$defaultFn(() => new Date())
-    .notNull(),
-});
-
-// Color schemes/themes
-export const colorSchemes = pgTable("color_schemes", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-
-  // Color palette
-  colors: jsonb("colors").$type<{
-    primary: string;
-    secondary: string;
-    background: string;
-    surface: string;
-    text: string;
-    textSecondary: string;
-    accent: string;
-    border: string;
-  }>(),
-
-  preview: text("preview"), // URL preview image
-  isActive: boolean("is_active").notNull().default(true),
-  isPremium: boolean("is_premium").notNull().default(false),
-  sortOrder: integer("sort_order").notNull().default(0),
-
-  createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
 });

@@ -42,7 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +53,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   GripVertical,
-  Edit2,
   Trash2,
   Plus,
   Instagram,
@@ -95,7 +94,6 @@ interface LinkData {
   title: string;
   url: string;
   isActive: boolean;
-  openInNewTab: boolean;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -111,6 +109,15 @@ interface PendingChanges {
   hasChanges: boolean;
 }
 
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      error?: string;
+    };
+    status?: number;
+  };
+}
+
 // Validation schemas
 const ProfileSchema = z.object({
   displayName: z.string().min(1, "Display name is required"),
@@ -120,7 +127,9 @@ const ProfileSchema = z.object({
 
 const LinkSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  url: z.string().url("Please enter a valid URL (including http:// or https://)"),
+  url: z
+    .string()
+    .url("Please enter a valid URL (including http:// or https://)"),
 });
 
 // Profile Section Component
@@ -163,7 +172,7 @@ function ProfileSection({
         bio: profile.bio || "",
         socialLinks: profile.socialLinks || {},
       };
-      
+
       form.reset(newValues);
       initialValuesRef.current = newValues;
     }
@@ -174,17 +183,19 @@ function ProfileSection({
     const current = {
       displayName: formData.displayName,
       bio: formData.bio,
-      socialLinks: formData.socialLinks as Record<string, string> | undefined || {},
+      socialLinks:
+        (formData.socialLinks as Record<string, string> | undefined) || {},
     };
-    
+
     const initial = initialValuesRef.current;
-    
+
     // Check if values have actually changed from initial values
-    const hasChanged = 
+    const hasChanged =
       current.displayName !== initial.displayName ||
       current.bio !== initial.bio ||
-      JSON.stringify(current.socialLinks) !== JSON.stringify(initial.socialLinks);
-    
+      JSON.stringify(current.socialLinks) !==
+        JSON.stringify(initial.socialLinks);
+
     if (hasChanged) {
       onUpdate(current);
     }
@@ -223,17 +234,17 @@ function ProfileSection({
   const addSocial = () => {
     const trimmedUrl = urlValue.trim();
     if (!trimmedUrl || !selectedPlatform) return;
-    
+
     if (!/^https?:\/\//i.test(trimmedUrl)) {
       toast.error("URL must start with http:// or https://");
       return;
     }
-    
+
     setValue("socialLinks", {
       ...formData.socialLinks,
       [selectedPlatform]: trimmedUrl,
     });
-    
+
     resetSocialForm();
     setSocialDialogOpen(false);
     toast.success("Social link added!");
@@ -241,11 +252,11 @@ function ProfileSection({
 
   const deleteSocial = () => {
     if (!selectedPlatform) return;
-    
+
     const newSocialLinks = { ...formData.socialLinks };
     delete newSocialLinks[selectedPlatform];
     setValue("socialLinks", newSocialLinks);
-    
+
     resetSocialForm();
     setSocialDialogOpen(false);
     toast.success("Social link removed!");
@@ -276,9 +287,10 @@ function ProfileSection({
       <CardContent className="space-y-4">
         <div className="flex items-start gap-4">
           <Avatar className="w-16 h-16">
-            <AvatarImage
+            <Image
               src={profile?.avatar || "/placeholder.svg"}
               alt={formData.displayName || profile?.username}
+              fill
             />
             <AvatarFallback>
               {(formData.displayName || profile?.username || "")
@@ -286,7 +298,7 @@ function ProfileSection({
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          
+
           <div className="flex-1 space-y-3">
             <div>
               <Label htmlFor="displayName">Display Name</Label>
@@ -297,7 +309,7 @@ function ProfileSection({
                 placeholder="Your display name"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="bio">Bio</Label>
               <Input
@@ -307,7 +319,7 @@ function ProfileSection({
                 className="text-muted-foreground"
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               {Object.keys(formData.socialLinks || {}).map((platform) => (
                 <Button
@@ -320,8 +332,11 @@ function ProfileSection({
                   <SocialIcon name={platform} />
                 </Button>
               ))}
-              
-              <Dialog open={socialDialogOpen} onOpenChange={setSocialDialogOpen}>
+
+              <Dialog
+                open={socialDialogOpen}
+                onOpenChange={setSocialDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
@@ -335,10 +350,12 @@ function ProfileSection({
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle>
-                      {selectedPlatform ? "Edit Social Link" : "Add Social Link"}
+                      {selectedPlatform
+                        ? "Edit Social Link"
+                        : "Add Social Link"}
                     </DialogTitle>
                   </DialogHeader>
-                  
+
                   <div className="space-y-4">
                     {!selectedPlatform ? (
                       <div className="space-y-3">
@@ -349,7 +366,8 @@ function ProfileSection({
                         />
                         <div className="max-h-60 overflow-y-auto space-y-1">
                           {filteredPlatforms.map((platform) => {
-                            const hasLink = !!(formData.socialLinks?.[platform.id]);
+                            const hasLink =
+                              !!formData.socialLinks?.[platform.id];
                             return (
                               <Button
                                 key={platform.id}
@@ -357,7 +375,11 @@ function ProfileSection({
                                 className="w-full justify-between h-10"
                                 onClick={() => {
                                   setSelectedPlatform(platform.id);
-                                  setUrlValue(String(formData.socialLinks?.[platform.id] || ""));
+                                  setUrlValue(
+                                    String(
+                                      formData.socialLinks?.[platform.id] || ""
+                                    )
+                                  );
                                 }}
                               >
                                 <span>{platform.label}</span>
@@ -374,7 +396,11 @@ function ProfileSection({
                     ) : (
                       <div className="space-y-3">
                         <div className="text-sm font-medium">
-                          {socialPlatforms.find((p) => p.id === selectedPlatform)?.label}
+                          {
+                            socialPlatforms.find(
+                              (p) => p.id === selectedPlatform
+                            )?.label
+                          }
                         </div>
                         <Input
                           placeholder="https://example.com/yourprofile"
@@ -389,11 +415,12 @@ function ProfileSection({
                           <Button variant="outline" onClick={resetSocialForm}>
                             Back
                           </Button>
-                          <Button onClick={addSocial}>
-                            Save
-                          </Button>
+                          <Button onClick={addSocial}>Save</Button>
                           {formData.socialLinks?.[selectedPlatform] ? (
-                            <Button variant="destructive" onClick={deleteSocial}>
+                            <Button
+                              variant="destructive"
+                              onClick={deleteSocial}
+                            >
                               Delete
                             </Button>
                           ) : null}
@@ -455,7 +482,7 @@ function LinkCard({
       title: link.title || "",
       url: link.url || "",
     };
-    
+
     form.reset(newValues);
     initialValuesRef.current = newValues;
   }, [link.title, link.url, form]);
@@ -466,14 +493,13 @@ function LinkCard({
       title: formData.title,
       url: formData.url,
     };
-    
+
     const initial = initialValuesRef.current;
-    
+
     // Check if values have actually changed from initial values
-    const hasChanged = 
-      current.title !== initial.title ||
-      current.url !== initial.url;
-    
+    const hasChanged =
+      current.title !== initial.title || current.url !== initial.url;
+
     if (hasChanged && (current.title || current.url)) {
       onUpdate(current);
     }
@@ -503,7 +529,7 @@ function LinkCard({
         >
           <GripVertical className="w-4 h-4" />
         </Button>
-        
+
         <div className="flex-1 space-y-2">
           <div className="flex items-center justify-between">
             <Input
@@ -515,17 +541,16 @@ function LinkCard({
               checked={link.isActive}
               aria-label="Active"
               id="active"
-              
               onCheckedChange={(checked) => onUpdate({ isActive: checked })}
             />
           </div>
-          
+
           <Input
             {...form.register("url")}
             placeholder="https://example.com"
             className="text-sm text-muted-foreground border-0 px-0 shadow-none focus-visible:ring-0 bg-transparent"
           />
-          
+
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">0 clicks</span>
             <Button
@@ -570,7 +595,7 @@ function AddLinkDialog({
         <DialogHeader>
           <DialogTitle>Add New Link</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="title">Title</Label>
@@ -586,7 +611,7 @@ function AddLinkDialog({
               </p>
             )}
           </div>
-          
+
           <div>
             <Label htmlFor="url">URL</Label>
             <Input
@@ -600,7 +625,7 @@ function AddLinkDialog({
               </p>
             )}
           </div>
-          
+
           <div className="flex gap-2 pt-4">
             <Button type="submit" className="flex-1">
               Add Link
@@ -620,7 +645,13 @@ function AddLinkDialog({
 }
 
 // Preview Component
-function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }) {
+function Preview({
+  profile,
+  links,
+}: {
+  profile: ProfileData;
+  links: LinkData[];
+}) {
   const socialIcons: SocialIconMap = {
     instagram: Instagram,
     tiktok: Music,
@@ -644,14 +675,15 @@ function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }
         <CardTitle>Preview</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="w-64 h-[500px] bg-black rounded-[2.5rem] p-2 mx-auto">
-          <div className="w-full h-full bg-white rounded-[2rem] overflow-hidden">
+        <div className="w-64 h-[500px] border-4 border-foreground  rounded-[2.5rem] p-2 mx-auto">
+          <div className="w-full h-full  rounded-[2rem] overflow-hidden">
             <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
               <div className="text-center space-y-4">
                 <Avatar className="w-20 h-20 mx-auto">
-                  <AvatarImage
+                  <Image
                     src={profile?.avatar || "/placeholder.svg"}
                     alt={profile?.displayName || profile?.username}
+                    fill
                   />
                   <AvatarFallback>
                     {(profile?.displayName || profile?.username || "")
@@ -659,7 +691,7 @@ function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }
                       .toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <div>
                   <h2 className="text-lg font-semibold text-primary">
                     {profile?.displayName || profile?.username}
@@ -669,35 +701,38 @@ function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }
                       {profile.bio}
                     </p>
                   )}
-                  
-                  {profile?.socialLinks && Object.keys(profile.socialLinks).length > 0 && (
-                    <div className="flex justify-center gap-2 pt-2">
-                      {Object.entries(profile.socialLinks).map(([platform, url]) => {
-                        const Icon = socialIcons[platform];
-                        if (!Icon) return null;
-                        
-                        return (
-                          <Button
-                            key={platform}
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="w-8 h-8 rounded-full border-2"
-                          >
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Icon className="w-4 h-4" />
-                            </a>
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  )}
+
+                  {profile?.socialLinks &&
+                    Object.keys(profile.socialLinks).length > 0 && (
+                      <div className="flex justify-center gap-2 pt-2">
+                        {Object.entries(profile.socialLinks).map(
+                          ([platform, url]) => {
+                            const Icon = socialIcons[platform];
+                            if (!Icon) return null;
+
+                            return (
+                              <Button
+                                key={platform}
+                                asChild
+                                variant="outline"
+                                size="icon"
+                                className="w-8 h-8 rounded-full border-2"
+                              >
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <Icon className="w-4 h-4" />
+                                </a>
+                              </Button>
+                            );
+                          }
+                        )}
+                      </div>
+                    )}
                 </div>
-                
+
                 <div className="space-y-3">
                   {activeLinks.map((link) => (
                     <Button
@@ -708,8 +743,8 @@ function Preview({ profile, links }: { profile: ProfileData; links: LinkData[] }
                     >
                       <a
                         href={link.url || "#"}
-                        target={link.openInNewTab ? "_blank" : "_self"}
-                        rel={link.openInNewTab ? "noopener noreferrer" : undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         {link.title || "Untitled"}
                       </a>
@@ -782,7 +817,8 @@ export default function MicrositeStudioPage() {
   );
 
   const orderedLinks = useMemo(
-    () => [...currentLinks].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
+    () =>
+      [...currentLinks].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)),
     [currentLinks]
   );
 
@@ -817,38 +853,41 @@ export default function MicrositeStudioPage() {
 
   // Handlers
   const handleProfileUpdate = useCallback((updates: Partial<ProfileData>) => {
-    setPendingChanges(prev => ({
+    setPendingChanges((prev) => ({
       ...prev,
       profile: { ...prev.profile, ...updates },
       hasChanges: true,
     }));
   }, []);
 
-  const handleLinkUpdate = useCallback((linkId: string, updates: Partial<LinkData>) => {
-    // Update local state immediately
-    setLocalLinks(prev =>
-      prev.map(link =>
-        link.id === linkId ? { ...link, ...updates } : link
-      )
-    );
+  const handleLinkUpdate = useCallback(
+    (linkId: string, updates: Partial<LinkData>) => {
+      // Update local state immediately
+      setLocalLinks((prev) =>
+        prev.map((link) =>
+          link.id === linkId ? { ...link, ...updates } : link
+        )
+      );
 
-    // Track pending changes
-    setPendingChanges(prev => ({
-      ...prev,
-      links: {
-        ...prev.links,
-        [linkId]: { ...prev.links[linkId], ...updates },
-      },
-      hasChanges: true,
-    }));
-  }, []);
+      // Track pending changes
+      setPendingChanges((prev) => ({
+        ...prev,
+        links: {
+          ...prev.links,
+          [linkId]: { ...prev.links[linkId], ...updates },
+        },
+        hasChanges: true,
+      }));
+    },
+    []
+  );
 
   const handleLinkDelete = (linkId: string) => {
-    setLocalLinks(prev => prev.filter(link => link.id !== linkId));
+    setLocalLinks((prev) => prev.filter((link) => link.id !== linkId));
     deleteLinkMutation.mutate(linkId);
-    
+
     // Remove from pending changes
-    setPendingChanges(prev => {
+    setPendingChanges((prev) => {
       const newLinks = { ...prev.links };
       delete newLinks[linkId];
       return {
@@ -856,7 +895,7 @@ export default function MicrositeStudioPage() {
         links: newLinks,
       };
     });
-    
+
     toast.success("Link deleted");
   };
 
@@ -870,14 +909,13 @@ export default function MicrositeStudioPage() {
       title: data.title,
       url: data.url,
       isActive: true,
-      openInNewTab: true,
       sortOrder: currentLinks.length,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     // Add to local state immediately
-    setLocalLinks(prev => [...prev, newLink]);
+    setLocalLinks((prev) => [...prev, newLink]);
 
     // Create on server
     const payload: LinkCreateInput = {
@@ -891,16 +929,16 @@ export default function MicrositeStudioPage() {
     createLinkMutation.mutate(payload, {
       onSuccess: (createdLink) => {
         // Replace temp link with real one
-        setLocalLinks(prev =>
-          prev.map(link =>
-            link.id === tempId ? createdLink as LinkData : link
+        setLocalLinks((prev) =>
+          prev.map((link) =>
+            link.id === tempId ? (createdLink as LinkData) : link
           )
         );
         toast.success("Link added");
       },
       onError: () => {
         // Remove temp link on error
-        setLocalLinks(prev => prev.filter(link => link.id !== tempId));
+        setLocalLinks((prev) => prev.filter((link) => link.id !== tempId));
         toast.error("Failed to add link");
       },
     });
@@ -910,8 +948,8 @@ export default function MicrositeStudioPage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = orderedLinks.findIndex(link => link.id === active.id);
-    const newIndex = orderedLinks.findIndex(link => link.id === over.id);
+    const oldIndex = orderedLinks.findIndex((link) => link.id === active.id);
+    const newIndex = orderedLinks.findIndex((link) => link.id === over.id);
     const newOrder = arrayMove(orderedLinks, oldIndex, newIndex);
 
     // Update local state immediately
@@ -927,22 +965,36 @@ export default function MicrositeStudioPage() {
       // Save profile changes
       if (Object.keys(pendingChanges.profile).length > 0 && currentProfile) {
         // Filter social links to only include supported platforms and valid URLs
-        const socialLinks = pendingChanges.profile.socialLinks ?? currentProfile.socialLinks;
+        const socialLinks =
+          pendingChanges.profile.socialLinks ?? currentProfile.socialLinks;
         const validSocialLinks: Record<string, string> = {};
-        
+
         if (socialLinks) {
-          const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook', 'telegram', 'whatsapp', 'email', 'github'];
-          
+          const supportedPlatforms = [
+            "instagram",
+            "tiktok",
+            "youtube",
+            "twitter",
+            "linkedin",
+            "facebook",
+            "telegram",
+            "whatsapp",
+            "email",
+            "github",
+          ];
+
           Object.entries(socialLinks).forEach(([platform, url]) => {
             if (supportedPlatforms.includes(platform) && url && url.trim()) {
               validSocialLinks[platform] = url.trim();
             }
           });
         }
-        
+
         // Helper function to clean URL values
-        const cleanUrl = (url: string | undefined | null): string | undefined => {
-          if (!url || url.trim() === '') return undefined;
+        const cleanUrl = (
+          url: string | undefined | null
+        ): string | undefined => {
+          if (!url || url.trim() === "") return undefined;
           const trimmed = url.trim();
           // Basic URL validation
           try {
@@ -952,23 +1004,28 @@ export default function MicrositeStudioPage() {
             return undefined;
           }
         };
-        
+
         const profilePayload: ProfileUpdateInput = {
           id: currentProfile.id,
           username: currentProfile.username,
-          displayName: (pendingChanges.profile.displayName ?? currentProfile.displayName) || currentProfile.username,
+          displayName:
+            (pendingChanges.profile.displayName ??
+              currentProfile.displayName) ||
+            currentProfile.username,
           bio: pendingChanges.profile.bio ?? currentProfile.bio,
           avatar: cleanUrl(currentProfile.avatar),
-          backgroundImage: cleanUrl(currentProfile.backgroundImage),
           isPublic: currentProfile.isPublic,
-          socialLinks: Object.keys(validSocialLinks).length > 0 ? validSocialLinks : undefined,
+          socialLinks:
+            Object.keys(validSocialLinks).length > 0
+              ? validSocialLinks
+              : undefined,
         };
         promises.push(updateProfileMutation.mutateAsync(profilePayload));
       }
 
       // Save link changes
       Object.entries(pendingChanges.links).forEach(([linkId, updates]) => {
-        const link = currentLinks.find(l => l.id === linkId);
+        const link = currentLinks.find((l) => l.id === linkId);
         if (link) {
           const linkPayload: LinkUpdateInput = {
             id: linkId,
@@ -993,20 +1050,24 @@ export default function MicrositeStudioPage() {
       toast.success("All changes saved!");
     } catch (error) {
       console.error("Failed to save changes:", error);
-      
+
       // Extract more specific error message
       let errorMessage = "Failed to save some changes";
       if (error instanceof Error) {
         errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'response' in error) {
-        const response = (error as any).response;
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error
+      ) {
+        const response = (error as ApiErrorResponse).response;
         if (response?.data?.error) {
           errorMessage = response.data.error;
         } else if (response?.status === 400) {
           errorMessage = "Validation error: Please check your input data";
         }
       }
-      
+
       toast.error(errorMessage);
     }
   };
@@ -1032,7 +1093,7 @@ export default function MicrositeStudioPage() {
             {publicUrl}
           </a>
         </div>
-        
+
         <Button
           onClick={handleSaveAll}
           disabled={!pendingChanges.hasChanges}
@@ -1069,7 +1130,7 @@ export default function MicrositeStudioPage() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={orderedLinks.map(link => link.id)}
+                  items={orderedLinks.map((link) => link.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-3">
@@ -1077,14 +1138,16 @@ export default function MicrositeStudioPage() {
                       <LinkCard
                         key={link.id}
                         link={link}
-                        onUpdate={(updates) => handleLinkUpdate(link.id, updates)}
+                        onUpdate={(updates) =>
+                          handleLinkUpdate(link.id, updates)
+                        }
                         onDelete={() => handleLinkDelete(link.id)}
                       />
                     ))}
                     {orderedLinks.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>No links yet. Add your first link to get started!</p>
-                        <Button 
+                        <Button
                           onClick={() => setAddLinkDialogOpen(true)}
                           variant="outline"
                           className="mt-4"
@@ -1103,15 +1166,19 @@ export default function MicrositeStudioPage() {
 
         {/* Preview */}
         <div className="lg:col-span-1">
-          <Preview 
+          <Preview
             profile={{
               ...currentProfile,
               ...pendingChanges.profile,
-              displayName: pendingChanges.profile.displayName ?? currentProfile.displayName,
+              displayName:
+                pendingChanges.profile.displayName ??
+                currentProfile.displayName,
               bio: pendingChanges.profile.bio ?? currentProfile.bio,
-              socialLinks: pendingChanges.profile.socialLinks ?? currentProfile.socialLinks,
-            }} 
-            links={orderedLinks} 
+              socialLinks:
+                pendingChanges.profile.socialLinks ??
+                currentProfile.socialLinks,
+            }}
+            links={orderedLinks}
           />
         </div>
       </div>

@@ -14,10 +14,6 @@ import type {
   OrderItemUpdateInput,
   SubscriptionCreateInput,
   SubscriptionUpdateInput,
-  TemplateLayoutCreateInput,
-  TemplateLayoutUpdateInput,
-  ColorSchemeCreateInput,
-  ColorSchemeUpdateInput,
   AffiliateProgramCreateInput,
   AffiliateProgramUpdateInput,
   AffiliateCreateInput,
@@ -52,22 +48,6 @@ export async function deleteProfile(id: string) {
     `/api/link-in-bio/profiles?id=${encodeURIComponent(id)}`
   );
   return res.data as unknown;
-}
-
-// ===== Templates (for profile fields) =====
-export async function getTemplates(type: "layout" | "color" | "all" = "all") {
-  const res = await api.get(`/api/link-in-bio/templates?type=${type}`);
-  return res.data as { layoutTemplates?: unknown[]; colorSchemes?: unknown[] };
-}
-
-export async function getLayoutTemplates() {
-  const res = await api.get(`/api/link-in-bio/templates?type=layout`);
-  return (res.data?.layoutTemplates ?? []) as unknown[];
-}
-
-export async function getColorSchemes() {
-  const res = await api.get(`/api/link-in-bio/templates?type=color`);
-  return (res.data?.colorSchemes ?? []) as unknown[];
 }
 
 // ===== Links =====
@@ -282,41 +262,6 @@ export async function updateSubscription(input: SubscriptionUpdateInput) {
 export async function deleteSubscription(id: string) {
   const res = await api.delete(
     `/api/link-in-bio/subscriptions?id=${encodeURIComponent(id)}`
-  );
-  return res.data as unknown;
-}
-
-// ===== Templates Management =====
-export async function createLayoutTemplate(input: TemplateLayoutCreateInput) {
-  const res = await api.post(`/api/link-in-bio/templates?type=layout`, input);
-  return res.data as unknown;
-}
-
-export async function updateLayoutTemplate(input: TemplateLayoutUpdateInput) {
-  const res = await api.put(`/api/link-in-bio/templates?type=layout`, input);
-  return res.data as unknown;
-}
-
-export async function deleteLayoutTemplate(id: string) {
-  const res = await api.delete(
-    `/api/link-in-bio/templates?type=layout&id=${encodeURIComponent(id)}`
-  );
-  return res.data as unknown;
-}
-
-export async function createColorScheme(input: ColorSchemeCreateInput) {
-  const res = await api.post(`/api/link-in-bio/templates?type=color`, input);
-  return res.data as unknown;
-}
-
-export async function updateColorScheme(input: ColorSchemeUpdateInput) {
-  const res = await api.put(`/api/link-in-bio/templates?type=color`, input);
-  return res.data as unknown;
-}
-
-export async function deleteColorScheme(id: string) {
-  const res = await api.delete(
-    `/api/link-in-bio/templates?type=color&id=${encodeURIComponent(id)}`
   );
   return res.data as unknown;
 }

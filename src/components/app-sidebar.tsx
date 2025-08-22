@@ -11,6 +11,7 @@ import {
   IconLink,
   IconListDetails,
   IconMailFilled,
+  IconPalette,
   IconSearch,
   IconSettingsFilled,
   IconUsers,
@@ -43,6 +44,11 @@ const data = {
       title: "Microsite",
       url: "/studio/microsite",
       icon: IconListDetails,
+    },
+    {
+      title: "Design",
+      url: "/studio/design",
+      icon: IconPalette,
     },
     {
       title: "Links",

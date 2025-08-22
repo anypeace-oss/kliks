@@ -32,12 +32,7 @@ export const ProfileCreateSchema = z.object({
   displayName: z.string().min(1).optional(),
   bio: z.string().max(1000).optional(),
   avatar: OptionalUrlString,
-  backgroundImage: OptionalUrlString,
   isPublic: z.boolean().optional(),
-  analyticsEnabled: z.boolean().optional(),
-  layoutTemplateId: z.string().optional(),
-  colorSchemeId: z.string().optional(),
-  customCss: z.string().optional(),
   socialLinks: z
     .object({
       instagram: z.string().optional(),
@@ -55,30 +50,17 @@ export const ProfileCreateSchema = z.object({
     .optional(),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
+  
+  // Simplified layout/theme fields
+  layoutVariant: z.enum(["default", "store"]).optional().default("default"),
+  schemeVariant: z.enum(["theme1", "theme2"]).optional().default("theme1"),
+  buttonVariant: z.enum(["default", "destructive", "outline", "secondary", "ghost", "link"]).optional().default("default"),
 });
 
 export const ProfileUpdateSchema = ProfileCreateSchema.extend({
   id: z.string(),
 });
 
-// ===== Links (replaces Blocks) =====
-const ButtonStyleSchema = z
-  .object({
-    backgroundColor: z.string().optional(),
-    textColor: z.string().optional(),
-    borderRadius: z.string().optional(),
-    border: z.string().optional(),
-    animation: z.string().optional(),
-  })
-  .partial();
-
-const LinkConfigSchema = z
-  .object({
-    icon: z.string().optional(),
-    thumbnail: OptionalUrlString,
-    buttonStyle: ButtonStyleSchema.optional(),
-  })
-  .partial();
 
 export const LinkCreateSchema = z.object({
   profileId: z.string(),
@@ -195,51 +177,7 @@ export const SubscriptionUpdateSchema = SubscriptionCreateSchema.extend({
   id: z.string(),
 });
 
-// ===== Templates & Themes =====
-const LayoutConfigSchema = z.object({
-  layout: z.enum(["single-column", "two-column", "grid", "masonry"]),
-  headerStyle: z.enum(["minimal", "centered", "full-width"]),
-  buttonStyle: z.enum(["rounded", "square", "pill", "outlined"]),
-  spacing: z.enum(["compact", "normal", "spacious"]),
-});
 
-export const TemplateLayoutCreateSchema = z.object({
-  name: z.string().min(1),
-  slug: z.string().min(1),
-  description: z.string().optional(),
-  preview: OptionalUrlString,
-  config: LayoutConfigSchema,
-  isActive: z.boolean().optional(),
-  isPremium: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-});
-
-export const TemplateLayoutUpdateSchema = TemplateLayoutCreateSchema.extend({
-  id: z.string(),
-});
-
-export const ColorSchemeCreateSchema = z.object({
-  name: z.string().min(1),
-  slug: z.string().min(1),
-  colors: z.object({
-    primary: z.string(),
-    secondary: z.string(),
-    background: z.string(),
-    surface: z.string(),
-    text: z.string(),
-    textSecondary: z.string(),
-    accent: z.string(),
-    border: z.string(),
-  }),
-  preview: OptionalUrlString,
-  isActive: z.boolean().optional(),
-  isPremium: z.boolean().optional(),
-  sortOrder: z.number().int().optional(),
-});
-
-export const ColorSchemeUpdateSchema = ColorSchemeCreateSchema.extend({
-  id: z.string(),
-});
 
 // ===== Affiliates =====
 export const AffiliateProgramCreateSchema = z.object({
@@ -308,14 +246,6 @@ export type OrderItemCreateInput = z.infer<typeof OrderItemCreateSchema>;
 export type OrderItemUpdateInput = z.infer<typeof OrderItemUpdateSchema>;
 export type SubscriptionCreateInput = z.infer<typeof SubscriptionCreateSchema>;
 export type SubscriptionUpdateInput = z.infer<typeof SubscriptionUpdateSchema>;
-export type TemplateLayoutCreateInput = z.infer<
-  typeof TemplateLayoutCreateSchema
->;
-export type TemplateLayoutUpdateInput = z.infer<
-  typeof TemplateLayoutUpdateSchema
->;
-export type ColorSchemeCreateInput = z.infer<typeof ColorSchemeCreateSchema>;
-export type ColorSchemeUpdateInput = z.infer<typeof ColorSchemeUpdateSchema>;
 export type AffiliateProgramCreateInput = z.infer<
   typeof AffiliateProgramCreateSchema
 >;
