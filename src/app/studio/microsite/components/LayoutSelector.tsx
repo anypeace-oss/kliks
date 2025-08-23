@@ -87,7 +87,7 @@ export function LayoutSelector({ value, onValueChange }: LayoutSelectorProps) {
               <Button
                 key={layout.id}
                 variant="outline"
-                className={`h-auto p-4 flex flex-col items-start gap-3 relative ${
+                className={`relative h-auto p-4 flex flex-col items-start gap-3 relative ${
                   isSelected
                     ? "border-primary bg-primary/5 hover:bg-primary/10"
                     : "hover:bg-muted/50"
@@ -105,10 +105,10 @@ export function LayoutSelector({ value, onValueChange }: LayoutSelectorProps) {
                   <span className="font-medium text-left">{layout.name}</span>
                 </div>
 
-                <p className="text-sm text-muted-foreground text-left max-w-xs ">
+                <p className="text-sm text-muted-foreground text-left w-full whitespace-normal break-words">
                   {layout.description}
                 </p>
-
+                
                 <div className="w-full">{layout.preview}</div>
               </Button>
             );

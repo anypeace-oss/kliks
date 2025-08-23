@@ -40,7 +40,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,11 +67,6 @@ import {
   Send,
   MessageCircle,
   Save,
-  Copy,
-  Settings,
-  Eye,
-  EyeOff,
-  ArrowUpRight,
 } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -80,6 +75,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LayoutSelector } from "./components/LayoutSelector";
 import { ThemeSelector } from "./components/ThemeSelector";
 import { ButtonVariantSelector } from "./components/ButtonVariantSelector";
+import { PreviewWithTheme } from "./components/PreviewWithTheme";
+import {
+  AVAILABLE_THEMES,
+  getAvailableThemeIds,
+} from "../../[profile]/components/ThemeLoader";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
@@ -102,7 +102,7 @@ interface ProfileData {
   seoDescription?: string;
   // Design variant fields
   layoutVariant?: "default" | "store";
-  schemeVariant?: "theme1" | "theme2";
+  schemeVariant?: string; // Support any theme
   buttonVariant?:
     | "default"
     | "destructive"
@@ -121,10 +121,6 @@ interface LinkData {
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
-}
-
-interface SocialIconMap {
-  [key: string]: React.ComponentType<{ className?: string }>;
 }
 
 interface PendingChanges {
@@ -156,9 +152,12 @@ const ProfileSchema = z.object({
   displayName: z.string().min(1, "Display name is required"),
   bio: z.string().optional(),
   socialLinks: z.record(z.string(), z.string()).optional(),
-  // Design variant fields
+  // Design variant fields with dynamic theme validation
   layoutVariant: z.enum(["default", "store"]).optional().default("default"),
-  schemeVariant: z.enum(["theme1", "theme2"]).optional().default("theme1"),
+  schemeVariant: z
+    .enum(getAvailableThemeIds() as [string, ...string[]])
+    .optional()
+    .default("theme1"),
   buttonVariant: z
     .enum(["default", "destructive", "outline", "secondary", "ghost", "link"])
     .optional()
@@ -220,7 +219,7 @@ function ProfileSection({
     bio: string;
     socialLinks: Record<string, string>;
     layoutVariant: "default" | "store";
-    schemeVariant: "theme1" | "theme2";
+    schemeVariant: string; // Flexible theme support
     buttonVariant: ButtonVariant;
   }>({
     displayName: "",
@@ -257,8 +256,7 @@ function ProfileSection({
         (formData.socialLinks as Record<string, string> | undefined) || {},
       layoutVariant:
         (formData.layoutVariant as "default" | "store") || "default",
-      schemeVariant:
-        (formData.schemeVariant as "theme1" | "theme2") || "theme1",
+      schemeVariant: (formData.schemeVariant as string) || "theme1",
       buttonVariant: (formData.buttonVariant as ButtonVariant) || "default",
     };
 
@@ -300,7 +298,10 @@ function ProfileSection({
     { id: "whatsapp", label: "WhatsApp" },
   ];
 
-  const socialIcons: SocialIconMap = {
+  const socialIcons: Record<
+    string,
+    React.ComponentType<{ className?: string }>
+  > = {
     instagram: Instagram,
     tiktok: Music,
     youtube: Youtube,
@@ -752,8 +753,12 @@ function DesignSection({
     onUpdate({ layoutVariant: value });
   };
 
-  const handleThemeChange = (value: "theme1" | "theme2") => {
-    onUpdate({ schemeVariant: value });
+  const handleThemeChange = (value: string) => {
+    // Ensure the value is a valid theme ID
+    const validThemeIds = getAvailableThemeIds();
+    if (validThemeIds.includes(value)) {
+      onUpdate({ schemeVariant: value });
+    }
   };
 
   const handleButtonVariantChange = (value: ButtonVariant) => {
@@ -981,149 +986,6 @@ function AddLinkDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// Preview Component
-function Preview({
-  profile,
-  links,
-}: {
-  profile: ProfileData;
-  links: LinkData[];
-}) {
-  const socialIcons: SocialIconMap = {
-    instagram: Instagram,
-    tiktok: Music,
-    youtube: Youtube,
-    email: Mail,
-    facebook: Facebook,
-    twitter: Twitter,
-    linkedin: Linkedin,
-    github: Github,
-    telegram: Send,
-    whatsapp: MessageCircle,
-  };
-
-  const activeLinks = links
-    .filter((link) => link.isActive)
-    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-
-  // Get design settings with defaults
-  const layoutVariant = profile?.layoutVariant || "default";
-  const schemeVariant = profile?.schemeVariant || "theme1";
-  const buttonVariant = profile?.buttonVariant || "default";
-
-  // Theme classes based on schemeVariant
-  const themeClasses =
-    schemeVariant === "theme1"
-      ? "bg-white text-black font-mono"
-      : "bg-white text-blue-900 font-sans";
-
-  // Layout classes based on layoutVariant
-  const isStoreLayout = layoutVariant === "store";
-
-  return (
-    <>
-      <div className="w-64 h-[500px] border-4 border-foreground rounded-[2.5rem] p-2 mx-auto">
-        <div
-          className={`w-full h-full rounded-[2rem] overflow-hidden ${themeClasses}`}
-        >
-          <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
-            <div className="text-center space-y-4">
-              <Avatar className="w-20 h-20 mx-auto">
-                <Image
-                  src={profile?.avatar || "/placeholder.svg"}
-                  alt={profile?.displayName || profile?.username}
-                  fill
-                />
-                <AvatarFallback>
-                  {(profile?.displayName || profile?.username || "")
-                    .charAt(0)
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-
-              <div>
-                <h2 className="text-lg font-semibold text-primary">
-                  {profile?.displayName || profile?.username}
-                </h2>
-                {profile?.bio && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {profile.bio}
-                  </p>
-                )}
-
-                {profile?.socialLinks &&
-                  Object.keys(profile.socialLinks).length > 0 && (
-                    <div className="flex justify-center gap-2 pt-2">
-                      {Object.entries(profile.socialLinks).map(
-                        ([platform, url]) => {
-                          const Icon = socialIcons[platform];
-                          if (!Icon) return null;
-
-                          return (
-                            <Button
-                              key={platform}
-                              asChild
-                              variant="outline"
-                              size="icon"
-                              className="w-8 h-8 rounded-full border-2"
-                            >
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Icon className="w-4 h-4" />
-                              </a>
-                            </Button>
-                          );
-                        }
-                      )}
-                    </div>
-                  )}
-              </div>
-
-              <div
-                className={
-                  isStoreLayout ? "grid grid-cols-2 gap-2" : "space-y-3"
-                }
-              >
-                {activeLinks.map((link) => (
-                  <Button
-                    key={link.id}
-                    asChild
-                    variant={buttonVariant}
-                    className={
-                      isStoreLayout
-                        ? "h-16 text-xs flex flex-col p-2"
-                        : "w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                    }
-                  >
-                    <a
-                      href={link.url || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {isStoreLayout ? (
-                        <>
-                          <span className="font-medium truncate w-full">
-                            {link.title || "Untitled"}
-                          </span>
-                        </>
-                      ) : (
-                        link.title || "Untitled"
-                      )}
-                    </a>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -1534,8 +1396,6 @@ export default function MicrositeStudioPage() {
     return <div className="p-6">Loading...</div>;
   }
 
-  const publicUrl = `http://localhost:3000/${currentProfile.username}`;
-
   return (
     <div className="p-6 space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1603,7 +1463,7 @@ export default function MicrositeStudioPage() {
         {/* Preview */}
         <div className="lg:col-span-1">
           <div className="sticky top-20 max-h-[calc(100vh-2rem)] overflow-y-auto">
-            <Preview
+            <PreviewWithTheme
               profile={{
                 ...currentProfile,
                 ...pendingChanges.profile,

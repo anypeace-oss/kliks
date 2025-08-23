@@ -1,4 +1,15 @@
 import { z } from "zod";
+import { getAvailableThemeIds } from "../theme-config";
+
+// Dynamic theme validation - this will be updated automatically when new themes are added
+function getThemeIdsForValidation(): [string, ...string[]] {
+  const themeIds = getAvailableThemeIds();
+  // Ensure we have at least one theme ID for the z.enum type
+  return themeIds.length > 0 ? themeIds as [string, ...string[]] : ["theme1"];
+}
+
+// Create theme enum dynamically
+const ThemeEnum = z.enum(getThemeIdsForValidation());
 
 // Reusable helpers
 const decimalPattern = /^\d+(\.\d{1,2})?$/;
@@ -15,7 +26,7 @@ export const OptionalUrlString = z
     z.string().url({ message: "Must be a valid URL" }),
     z.literal(""),
     z.null(),
-    z.undefined()
+    z.undefined(),
   ])
   .optional()
   .transform((v) => {
@@ -50,17 +61,19 @@ export const ProfileCreateSchema = z.object({
     .optional(),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
-  
-  // Simplified layout/theme fields
+
+  // Simplified layout/theme fields with dynamic theme support
   layoutVariant: z.enum(["default", "store"]).optional().default("default"),
-  schemeVariant: z.enum(["theme1", "theme2"]).optional().default("theme1"),
-  buttonVariant: z.enum(["default", "destructive", "outline", "secondary", "ghost", "link"]).optional().default("default"),
+  schemeVariant: ThemeEnum.optional().default("theme1"),
+  buttonVariant: z
+    .enum(["default", "destructive", "outline", "secondary", "ghost", "link"])
+    .optional()
+    .default("default"),
 });
 
 export const ProfileUpdateSchema = ProfileCreateSchema.extend({
   id: z.string(),
 });
-
 
 export const LinkCreateSchema = z.object({
   profileId: z.string(),
@@ -176,8 +189,6 @@ export const SubscriptionCreateSchema = z.object({
 export const SubscriptionUpdateSchema = SubscriptionCreateSchema.extend({
   id: z.string(),
 });
-
-
 
 // ===== Affiliates =====
 export const AffiliateProgramCreateSchema = z.object({

@@ -3,6 +3,7 @@ import { profiles, links } from "@/lib/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ThemeLoader } from "./components/ThemeLoader";
+import { isValidTheme } from "@/lib/theme-config";
 import { LayoutRenderer } from "./components/LayoutRenderer";
 
 // Type definitions
@@ -68,8 +69,11 @@ export default async function ProfilePage({
     return true;
   });
 
-  // Default fallback values for theme and layout
-  const schemeVariant = (prof.schemeVariant as "theme1" | "theme2") || "theme1";
+  // Validate and set theme with proper fallback
+  const schemeVariant =
+    prof.schemeVariant && isValidTheme(prof.schemeVariant)
+      ? prof.schemeVariant
+      : "theme1";
 
   return (
     <>
