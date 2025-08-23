@@ -71,6 +71,7 @@ import {
   Settings,
   Eye,
   EyeOff,
+  ArrowUpRight,
 } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,6 +80,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LayoutSelector } from "./components/LayoutSelector";
 import { ThemeSelector } from "./components/ThemeSelector";
 import { ButtonVariantSelector } from "./components/ButtonVariantSelector";
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 
 // Types
 interface ProfileData {
@@ -99,7 +103,13 @@ interface ProfileData {
   // Design variant fields
   layoutVariant?: "default" | "store";
   schemeVariant?: "theme1" | "theme2";
-  buttonVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  buttonVariant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
 }
 
 interface LinkData {
@@ -133,7 +143,13 @@ interface ApiErrorResponse {
 }
 
 // Design-related types
-type ButtonVariant = "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+type ButtonVariant =
+  | "default"
+  | "destructive"
+  | "outline"
+  | "secondary"
+  | "ghost"
+  | "link";
 
 // Validation schemas
 const ProfileSchema = z.object({
@@ -143,7 +159,10 @@ const ProfileSchema = z.object({
   // Design variant fields
   layoutVariant: z.enum(["default", "store"]).optional().default("default"),
   schemeVariant: z.enum(["theme1", "theme2"]).optional().default("theme1"),
-  buttonVariant: z.enum(["default", "destructive", "outline", "secondary", "ghost", "link"]).optional().default("default"),
+  buttonVariant: z
+    .enum(["default", "destructive", "outline", "secondary", "ghost", "link"])
+    .optional()
+    .default("default"),
 });
 
 const LinkSchema = z.object({
@@ -176,7 +195,9 @@ function ProfileSection({
   const [copySuccess, setCopySuccess] = useState(false);
   const [confirmationText, setConfirmationText] = useState("");
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
+    null
+  );
 
   const form = useForm({
     resolver: zodResolver(ProfileSchema),
@@ -201,13 +222,13 @@ function ProfileSection({
     layoutVariant: "default" | "store";
     schemeVariant: "theme1" | "theme2";
     buttonVariant: ButtonVariant;
-  }>({ 
-    displayName: "", 
-    bio: "", 
+  }>({
+    displayName: "",
+    bio: "",
     socialLinks: {},
     layoutVariant: "default",
     schemeVariant: "theme1",
-    buttonVariant: "default"
+    buttonVariant: "default",
   });
 
   // Real-time updates
@@ -234,8 +255,10 @@ function ProfileSection({
       bio: formData.bio,
       socialLinks:
         (formData.socialLinks as Record<string, string> | undefined) || {},
-      layoutVariant: (formData.layoutVariant as "default" | "store") || "default",
-      schemeVariant: (formData.schemeVariant as "theme1" | "theme2") || "theme1",
+      layoutVariant:
+        (formData.layoutVariant as "default" | "store") || "default",
+      schemeVariant:
+        (formData.schemeVariant as "theme1" | "theme2") || "theme1",
       buttonVariant: (formData.buttonVariant as ButtonVariant) || "default",
     };
 
@@ -254,7 +277,15 @@ function ProfileSection({
     if (hasChanged) {
       onUpdate(current);
     }
-  }, [formData.displayName, formData.bio, formData.socialLinks, formData.layoutVariant, formData.schemeVariant, formData.buttonVariant, onUpdate]);
+  }, [
+    formData.displayName,
+    formData.bio,
+    formData.socialLinks,
+    formData.layoutVariant,
+    formData.schemeVariant,
+    formData.buttonVariant,
+    onUpdate,
+  ]);
 
   const socialPlatforms = [
     { id: "instagram", label: "Instagram" },
@@ -286,7 +317,11 @@ function ProfileSection({
     p.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  const currentUrl = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/${profile?.username}`;
+  const currentUrl = `${
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000"
+  }/${profile?.username}`;
 
   const copyToClipboard = async () => {
     try {
@@ -317,10 +352,13 @@ function ProfileSection({
     const timeoutId = setTimeout(async () => {
       setIsCheckingUsername(true);
       setUsernameError("");
-      
+
       try {
-        const result = await checkUsernameAvailability(newUsername.trim(), profile?.id);
-        
+        const result = await checkUsernameAvailability(
+          newUsername.trim(),
+          profile?.id
+        );
+
         if (result.available) {
           setUsernameAvailable(true);
           setUsernameError("");
@@ -341,7 +379,11 @@ function ProfileSection({
   }, [newUsername, profile?.username, profile?.id]);
 
   const handleUsernameSubmit = async () => {
-    if (!newUsername.trim() || !usernameAvailable || confirmationText !== "YAKIN") {
+    if (
+      !newUsername.trim() ||
+      !usernameAvailable ||
+      confirmationText !== "YAKIN"
+    ) {
       return;
     }
 
@@ -349,7 +391,7 @@ function ProfileSection({
 
     try {
       const success = await onUsernameUpdate(newUsername.trim());
-      
+
       if (success) {
         setUsernameDialogOpen(false);
         setNewUsername("");
@@ -416,312 +458,276 @@ function ProfileSection({
 
   return (
     <div className="space-y-6">
-      {/* URL Management Section */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4 bg-muted/30 rounded-lg p-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                <span>My Lynkid:</span>
-                <div className="flex items-center gap-1">
-                  {(pendingProfile.isPublic ?? profile?.isPublic) ? (
-                    <Eye className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <EyeOff className="w-4 h-4 text-orange-600" />
-                  )}
-                  <span className={(pendingProfile.isPublic ?? profile?.isPublic) ? "text-green-600" : "text-orange-600"}>
-                    {(pendingProfile.isPublic ?? profile?.isPublic) ? "Public" : "Private"}
-                  </span>
-                </div>
-              </div>
-              <div className="font-mono text-sm truncate">
+      <Alert>
+        <AlertTitle className="flex gap-2 items-center">
+          {pendingProfile.isPublic ?? profile?.isPublic ? (
+            <>
+              🔥 Your Profile is live!:
+              <Link
+                href={currentUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+                className="font-mono text-xs truncate flex underline "
+              >
                 {currentUrl}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyToClipboard}
-                className="gap-2"
-              >
-                <Copy className="w-4 h-4" />
-                {copySuccess ? "Copied!" : "Share"}
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setNewUsername(profile?.username || "");
-                  setConfirmationText("");
-                  setUsernameError("");
-                  setUsernameAvailable(null);
-                  setUsernameDialogOpen(true);
-                }}
-                className="gap-2"
-              >
-                <Settings className="w-4 h-4" />
-                Customize URL
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </Link>
+            </>
+          ) : (
+            <>Oh noo🤒, Your Profile is not live </>
+          )}
+        </AlertTitle>
+        <AlertDescription>
+          <p
+            onClick={copyToClipboard}
+            className="gap-2 cursor-pointer flex items-center hover:text-primary text-muted-foreground trasition-colors"
+          >
+            {/* <Copy className="w-4 h-4" /> */}
+            {copySuccess ? "Copied!" : "Copy your profile URL"}
+          </p>
+        </AlertDescription>
+      </Alert>
+      <div className="flex items-center gap-2">
+        <Label htmlFor="isPublic" className="text-sm font-medium">
+          Public Profile
+        </Label>
+        <Switch
+          id="isPublic"
+          checked={pendingProfile.isPublic ?? profile?.isPublic ?? true}
+          onCheckedChange={handlePublicToggle}
+        />
+      </div>
+      <div className="flex items-start gap-4">
+        <Avatar className="w-20 h-20">
+          <Image
+            src={profile?.avatar || "/placeholder.svg"}
+            alt={formData.displayName || profile?.username}
+            fill
+          />
+          <AvatarFallback>
+            {(formData.displayName || profile?.username || "")
+              .charAt(0)
+              .toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
 
-      {/* Profile Details */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Profile</CardTitle>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="isPublic" className="text-sm font-medium">
-                Public Profile
-              </Label>
-              <Switch
-                id="isPublic"
-                checked={pendingProfile.isPublic ?? profile?.isPublic ?? true}
-                onCheckedChange={handlePublicToggle}
-              />
-            </div>
-          </div>
-        </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-start gap-4">
-          <Avatar className="w-16 h-16">
-            <Image
-              src={profile?.avatar || "/placeholder.svg"}
-              alt={formData.displayName || profile?.username}
-              fill
+        <div className="flex-1 space-y-3">
+          <div className="space-y-2">
+            {/* <Label htmlFor="displayName ">Display Name</Label> */}
+            <Input
+              id="displayName"
+              {...form.register("displayName")}
+              placeholder="Your display name"
             />
-            <AvatarFallback>
-              {(formData.displayName || profile?.username || "")
-                .charAt(0)
-                .toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          </div>
 
-          <div className="flex-1 space-y-3">
-            <div>
-              <Label htmlFor="displayName">Display Name</Label>
-              <Input
-                id="displayName"
-                {...form.register("displayName")}
-                className="text-xl font-semibold"
-                placeholder="Your display name"
-              />
-            </div>
+          <div className="space-y-2">
+            {/* <Label htmlFor="bio">Bio</Label> */}
+            <Textarea
+              id="bio"
+              {...form.register("bio")}
+              placeholder="Tell people about yourself"
+            />
+          </div>
 
-            <div>
-              <Label htmlFor="bio">Bio</Label>
-              <Input
-                id="bio"
-                {...form.register("bio")}
-                placeholder="Tell people about yourself"
-                className="text-muted-foreground"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            {Object.keys(formData.socialLinks || {}).map((platform) => (
+              <Button
+                key={platform}
+                variant="ghost"
+                size="sm"
+                className="p-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => handleSocialEdit(platform)}
+              >
+                <SocialIcon name={platform} />
+              </Button>
+            ))}
 
-            <div className="flex items-center gap-2">
-              {Object.keys(formData.socialLinks || {}).map((platform) => (
+            <Dialog open={socialDialogOpen} onOpenChange={setSocialDialogOpen}>
+              <DialogTrigger asChild>
                 <Button
-                  key={platform}
                   variant="ghost"
                   size="sm"
                   className="p-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={() => handleSocialEdit(platform)}
+                  onClick={resetSocialForm}
                 >
-                  <SocialIcon name={platform} />
+                  <Plus className="w-4 h-4" />
                 </Button>
-              ))}
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedPlatform ? "Edit Social Link" : "Add Social Link"}
+                  </DialogTitle>
+                </DialogHeader>
 
-              <Dialog
-                open={socialDialogOpen}
-                onOpenChange={setSocialDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                    onClick={resetSocialForm}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {selectedPlatform
-                        ? "Edit Social Link"
-                        : "Add Social Link"}
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="space-y-4">
-                    {!selectedPlatform ? (
-                      <div className="space-y-3">
-                        <Input
-                          placeholder="Search platforms..."
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                        <div className="max-h-60 overflow-y-auto space-y-1">
-                          {filteredPlatforms.map((platform) => {
-                            const hasLink =
-                              !!formData.socialLinks?.[platform.id];
-                            return (
-                              <Button
-                                key={platform.id}
-                                variant="ghost"
-                                className="w-full justify-between h-10"
-                                onClick={() => {
-                                  setSelectedPlatform(platform.id);
-                                  setUrlValue(
-                                    String(
-                                      formData.socialLinks?.[platform.id] || ""
-                                    )
-                                  );
-                                }}
-                              >
-                                <span>{platform.label}</span>
-                                {hasLink ? (
-                                  <span className="text-primary">✓</span>
-                                ) : (
-                                  <Plus className="w-4 h-4" />
-                                )}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="text-sm font-medium">
-                          {
-                            socialPlatforms.find(
-                              (p) => p.id === selectedPlatform
-                            )?.label
-                          }
-                        </div>
-                        <Input
-                          placeholder="https://example.com/yourprofile"
-                          value={urlValue}
-                          onChange={(e) => setUrlValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") addSocial();
-                          }}
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={resetSocialForm}>
-                            Back
-                          </Button>
-                          <Button onClick={addSocial}>Save</Button>
-                          {formData.socialLinks?.[selectedPlatform] ? (
+                <div className="space-y-4">
+                  {!selectedPlatform ? (
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Search platforms..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      <div className="max-h-60 overflow-y-auto space-y-1">
+                        {filteredPlatforms.map((platform) => {
+                          const hasLink = !!formData.socialLinks?.[platform.id];
+                          return (
                             <Button
-                              variant="destructive"
-                              onClick={deleteSocial}
+                              key={platform.id}
+                              variant="ghost"
+                              className="w-full justify-between h-10"
+                              onClick={() => {
+                                setSelectedPlatform(platform.id);
+                                setUrlValue(
+                                  String(
+                                    formData.socialLinks?.[platform.id] || ""
+                                  )
+                                );
+                              }}
                             >
-                              Delete
+                              <span>{platform.label}</span>
+                              {hasLink ? (
+                                <span className="text-primary">✓</span>
+                              ) : (
+                                <Plus className="w-4 h-4" />
+                              )}
                             </Button>
-                          ) : null}
-                        </div>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium">
+                        {
+                          socialPlatforms.find((p) => p.id === selectedPlatform)
+                            ?.label
+                        }
+                      </div>
+                      <Input
+                        placeholder="https://example.com/yourprofile"
+                        value={urlValue}
+                        onChange={(e) => setUrlValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") addSocial();
+                        }}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={resetSocialForm}>
+                          Back
+                        </Button>
+                        <Button onClick={addSocial}>Save</Button>
+                        {formData.socialLinks?.[selectedPlatform] ? (
+                          <Button variant="destructive" onClick={deleteSocial}>
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
 
-    {/* Username Customization Dialog */}
-    <Dialog open={usernameDialogOpen} onOpenChange={setUsernameDialogOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Customize Your URL</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-muted-foreground flex-shrink-0">
-                {typeof window !== 'undefined' ? window.location.origin : 'localhost:3000'}/
-              </span>
-              <Input
-                id="username"
-                value={newUsername}
-                onChange={(e) => {
-                  setNewUsername(e.target.value);
-                }}
-                placeholder="your-username"
-                className="flex-1"
-                autoFocus
-              />
-            </div>
-            <div className="mt-1 min-h-[20px]">
-              {isCheckingUsername && (
-                <p className="text-sm text-muted-foreground">Checking availability...</p>
-              )}
-              {usernameError && (
-                <p className="text-sm text-destructive">{usernameError}</p>
-              )}
-              {usernameAvailable === true && newUsername.trim() !== profile?.username && (
-                <p className="text-sm text-green-600">✓ Username is available</p>
-              )}
-            </div>
-          </div>
-          
-          {/* Confirmation Field */}
-          {usernameAvailable && newUsername.trim() !== profile?.username && (
+      {/* Username Customization Dialog */}
+      <Dialog open={usernameDialogOpen} onOpenChange={setUsernameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Customize Your URL</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="confirmation">Type &quot;YAKIN&quot; to confirm</Label>
-              <Input
-                id="confirmation"
-                value={confirmationText}
-                onChange={(e) => setConfirmationText(e.target.value)}
-                placeholder="YAKIN"
-                className="mt-1"
-              />
-              <p className="text-sm text-muted-foreground mt-1">
-                This action will change your profile URL permanently.
-              </p>
+              <Label htmlFor="username">Username</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm text-muted-foreground flex-shrink-0">
+                  {typeof window !== "undefined"
+                    ? window.location.origin
+                    : "localhost:3000"}
+                  /
+                </span>
+                <Input
+                  id="username"
+                  value={newUsername}
+                  onChange={(e) => {
+                    setNewUsername(e.target.value);
+                  }}
+                  placeholder="your-username"
+                  className="flex-1"
+                  autoFocus
+                />
+              </div>
+              <div className="mt-1 min-h-[20px]">
+                {isCheckingUsername && (
+                  <p className="text-sm text-muted-foreground">
+                    Checking availability...
+                  </p>
+                )}
+                {usernameError && (
+                  <p className="text-sm text-destructive">{usernameError}</p>
+                )}
+                {usernameAvailable === true &&
+                  newUsername.trim() !== profile?.username && (
+                    <p className="text-sm text-green-600">
+                      ✓ Username is available
+                    </p>
+                  )}
+              </div>
             </div>
-          )}
-          
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setUsernameDialogOpen(false);
-                setNewUsername("");
-                setConfirmationText("");
-                setUsernameError("");
-                setUsernameAvailable(null);
-              }}
-              disabled={isUpdatingUsername}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUsernameSubmit}
-              disabled={
-                isUpdatingUsername ||
-                !usernameAvailable ||
-                confirmationText !== "YAKIN" ||
-                newUsername.trim() === profile?.username
-              }
-            >
-              {isUpdatingUsername ? "Updating..." : "Save"}
-            </Button>
+
+            {/* Confirmation Field */}
+            {usernameAvailable && newUsername.trim() !== profile?.username && (
+              <div>
+                <Label htmlFor="confirmation">
+                  Type &quot;YAKIN&quot; to confirm
+                </Label>
+                <Input
+                  id="confirmation"
+                  value={confirmationText}
+                  onChange={(e) => setConfirmationText(e.target.value)}
+                  placeholder="YAKIN"
+                  className="mt-1"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  This action will change your profile URL permanently.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUsernameDialogOpen(false);
+                  setNewUsername("");
+                  setConfirmationText("");
+                  setUsernameError("");
+                  setUsernameAvailable(null);
+                }}
+                disabled={isUpdatingUsername}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUsernameSubmit}
+                disabled={
+                  isUpdatingUsername ||
+                  !usernameAvailable ||
+                  confirmationText !== "YAKIN" ||
+                  newUsername.trim() === profile?.username
+                }
+              >
+                {isUpdatingUsername ? "Updating..." : "Save"}
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </div>
-);
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 // Design Section Component
@@ -735,9 +741,12 @@ function DesignSection({
   onUpdate: (updates: Partial<ProfileData>) => void;
 }) {
   // Use pending changes first, then fallback to profile, then defaults
-  const layoutVariant = pendingProfile?.layoutVariant ?? profile?.layoutVariant ?? "default";
-  const schemeVariant = pendingProfile?.schemeVariant ?? profile?.schemeVariant ?? "theme1";
-  const buttonVariant = pendingProfile?.buttonVariant ?? profile?.buttonVariant ?? "default";
+  const layoutVariant =
+    pendingProfile?.layoutVariant ?? profile?.layoutVariant ?? "default";
+  const schemeVariant =
+    pendingProfile?.schemeVariant ?? profile?.schemeVariant ?? "theme1";
+  const buttonVariant =
+    pendingProfile?.buttonVariant ?? profile?.buttonVariant ?? "default";
 
   const handleLayoutChange = (value: "default" | "store") => {
     onUpdate({ layoutVariant: value });
@@ -752,29 +761,20 @@ function DesignSection({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Design Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <LayoutSelector
-            value={layoutVariant}
-            onValueChange={handleLayoutChange}
-          />
-          
-          <ThemeSelector
-            value={schemeVariant}
-            onValueChange={handleThemeChange}
-          />
-          
-          <ButtonVariantSelector
-            value={buttonVariant}
-            onValueChange={handleButtonVariantChange}
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-6  border-t pt-6">
+      <h2 className="text-md font-medium">Design Settings</h2>
+      <LayoutSelector
+        value={layoutVariant}
+        onValueChange={handleLayoutChange}
+      />
+
+      <ThemeSelector value={schemeVariant} onValueChange={handleThemeChange} />
+
+      <ButtonVariantSelector
+        value={buttonVariant}
+        onValueChange={handleButtonVariantChange}
+      />
+    </div>
   );
 }
 
@@ -855,7 +855,7 @@ function LinkCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className={`p-4 transition-opacity ${isDragging ? "opacity-50" : ""} ${
+      className={` p-4 transition-opacity ${isDragging ? "opacity-50" : ""} ${
         !link.isActive ? "bg-muted/50" : ""
       }`}
     >
@@ -1015,123 +1015,115 @@ function Preview({
   const buttonVariant = profile?.buttonVariant || "default";
 
   // Theme classes based on schemeVariant
-  const themeClasses = schemeVariant === "theme1" 
-    ? "bg-white text-black font-mono" 
-    : "bg-white text-blue-900 font-sans";
+  const themeClasses =
+    schemeVariant === "theme1"
+      ? "bg-white text-black font-mono"
+      : "bg-white text-blue-900 font-sans";
 
   // Layout classes based on layoutVariant
   const isStoreLayout = layoutVariant === "store";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Preview</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="w-64 h-[500px] border-4 border-foreground rounded-[2.5rem] p-2 mx-auto">
-          <div className={`w-full h-full rounded-[2rem] overflow-hidden ${themeClasses}`}>
-            <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
-              <div className="text-center space-y-4">
-                <Avatar className="w-20 h-20 mx-auto">
-                  <Image
-                    src={profile?.avatar || "/placeholder.svg"}
-                    alt={profile?.displayName || profile?.username}
-                    fill
-                  />
-                  <AvatarFallback>
-                    {(profile?.displayName || profile?.username || "")
-                      .charAt(0)
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+    <>
+      <div className="w-64 h-[500px] border-4 border-foreground rounded-[2.5rem] p-2 mx-auto">
+        <div
+          className={`w-full h-full rounded-[2rem] overflow-hidden ${themeClasses}`}
+        >
+          <div className="pt-10 px-6 pb-6 h-full overflow-y-auto">
+            <div className="text-center space-y-4">
+              <Avatar className="w-20 h-20 mx-auto">
+                <Image
+                  src={profile?.avatar || "/placeholder.svg"}
+                  alt={profile?.displayName || profile?.username}
+                  fill
+                />
+                <AvatarFallback>
+                  {(profile?.displayName || profile?.username || "")
+                    .charAt(0)
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
 
-                <div>
-                  <h2 className="text-lg font-semibold text-primary">
-                    {profile?.displayName || profile?.username}
-                  </h2>
-                  {profile?.bio && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {profile.bio}
-                    </p>
-                  )}
+              <div>
+                <h2 className="text-lg font-semibold text-primary">
+                  {profile?.displayName || profile?.username}
+                </h2>
+                {profile?.bio && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {profile.bio}
+                  </p>
+                )}
 
-                  {profile?.socialLinks &&
-                    Object.keys(profile.socialLinks).length > 0 && (
-                      <div className="flex justify-center gap-2 pt-2">
-                        {Object.entries(profile.socialLinks).map(
-                          ([platform, url]) => {
-                            const Icon = socialIcons[platform];
-                            if (!Icon) return null;
+                {profile?.socialLinks &&
+                  Object.keys(profile.socialLinks).length > 0 && (
+                    <div className="flex justify-center gap-2 pt-2">
+                      {Object.entries(profile.socialLinks).map(
+                        ([platform, url]) => {
+                          const Icon = socialIcons[platform];
+                          if (!Icon) return null;
 
-                            return (
-                              <Button
-                                key={platform}
-                                asChild
-                                variant="outline"
-                                size="icon"
-                                className="w-8 h-8 rounded-full border-2"
+                          return (
+                            <Button
+                              key={platform}
+                              asChild
+                              variant="outline"
+                              size="icon"
+                              className="w-8 h-8 rounded-full border-2"
+                            >
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <Icon className="w-4 h-4" />
-                                </a>
-                              </Button>
-                            );
-                          }
-                        )}
-                      </div>
-                    )}
-                </div>
+                                <Icon className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          );
+                        }
+                      )}
+                    </div>
+                  )}
+              </div>
 
-                <div className={isStoreLayout ? "grid grid-cols-2 gap-2" : "space-y-3"}>
-                  {activeLinks.map((link) => (
-                    <Button
-                      key={link.id}
-                      asChild
-                      variant={buttonVariant}
-                      className={isStoreLayout 
-                        ? "h-16 text-xs flex flex-col p-2" 
+              <div
+                className={
+                  isStoreLayout ? "grid grid-cols-2 gap-2" : "space-y-3"
+                }
+              >
+                {activeLinks.map((link) => (
+                  <Button
+                    key={link.id}
+                    asChild
+                    variant={buttonVariant}
+                    className={
+                      isStoreLayout
+                        ? "h-16 text-xs flex flex-col p-2"
                         : "w-full py-3 text-sm font-medium rounded-full border-2 hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                      }
+                    }
+                  >
+                    <a
+                      href={link.url || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <a
-                        href={link.url || "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {isStoreLayout ? (
-                          <>
-                            <span className="font-medium truncate w-full">{link.title || "Untitled"}</span>
-                            <span className="text-xs opacity-70">Click here</span>
-                          </>
-                        ) : (
-                          link.title || "Untitled"
-                        )}
-                      </a>
-                    </Button>
-                  ))}
-                </div>
+                      {isStoreLayout ? (
+                        <>
+                          <span className="font-medium truncate w-full">
+                            {link.title || "Untitled"}
+                          </span>
+                        </>
+                      ) : (
+                        link.title || "Untitled"
+                      )}
+                    </a>
+                  </Button>
+                ))}
               </div>
             </div>
           </div>
         </div>
-        
-        <div className="mt-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            Layout: <span className="font-medium capitalize">{layoutVariant}</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Theme: <span className="font-medium capitalize">{schemeVariant}</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Buttons: <span className="font-medium capitalize">{buttonVariant}</span>
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
 
@@ -1198,41 +1190,59 @@ export default function MicrositeStudioPage() {
   );
 
   // Mutations
-  const updateProfileMutation = useMutation<ProfileData, Error, ProfileUpdateInput>({
-    mutationFn: async (payload: ProfileUpdateInput) => updateProfile(payload) as Promise<ProfileData>,
+  const updateProfileMutation = useMutation<
+    ProfileData,
+    Error,
+    ProfileUpdateInput
+  >({
+    mutationFn: async (payload: ProfileUpdateInput) =>
+      updateProfile(payload) as Promise<ProfileData>,
     onSuccess: (updatedProfile: ProfileData) => {
       // Immediately update the profiles query data to prevent UI reversion
-      queryClient.setQueryData(["profiles"], (oldProfiles: ProfileData[] | undefined) => {
-        if (!oldProfiles) return oldProfiles;
-        return oldProfiles.map(profile => 
-          profile.id === updatedProfile.id ? { ...profile, ...updatedProfile } : profile
-        );
-      });
+      queryClient.setQueryData(
+        ["profiles"],
+        (oldProfiles: ProfileData[] | undefined) => {
+          if (!oldProfiles) return oldProfiles;
+          return oldProfiles.map((profile) =>
+            profile.id === updatedProfile.id
+              ? { ...profile, ...updatedProfile }
+              : profile
+          );
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["profiles"] });
     },
   });
 
   const updateLinkMutation = useMutation<LinkData, Error, LinkUpdateInput>({
-    mutationFn: async (payload: LinkUpdateInput) => updateLink(payload) as Promise<LinkData>,
+    mutationFn: async (payload: LinkUpdateInput) =>
+      updateLink(payload) as Promise<LinkData>,
     onSuccess: (updatedLink: LinkData) => {
       // Immediately update the links query data
-      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
-        if (!oldLinks) return oldLinks;
-        return oldLinks.map(link => 
-          link.id === updatedLink.id ? { ...link, ...updatedLink } : link
-        );
-      });
+      queryClient.setQueryData(
+        ["links"],
+        (oldLinks: LinkData[] | undefined) => {
+          if (!oldLinks) return oldLinks;
+          return oldLinks.map((link) =>
+            link.id === updatedLink.id ? { ...link, ...updatedLink } : link
+          );
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
 
   const createLinkMutation = useMutation<LinkData, Error, LinkCreateInput>({
-    mutationFn: async (payload: LinkCreateInput) => createLink(payload) as Promise<LinkData>,
+    mutationFn: async (payload: LinkCreateInput) =>
+      createLink(payload) as Promise<LinkData>,
     onSuccess: (createdLink: LinkData) => {
       // Immediately update the links query data
-      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
-        return [...(oldLinks || []), createdLink];
-      });
+      queryClient.setQueryData(
+        ["links"],
+        (oldLinks: LinkData[] | undefined) => {
+          return [...(oldLinks || []), createdLink];
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
@@ -1241,10 +1251,13 @@ export default function MicrositeStudioPage() {
     mutationFn: async (id: string) => deleteLink(id) as Promise<void>,
     onSuccess: (_, deletedId) => {
       // Immediately update the links query data
-      queryClient.setQueryData(["links"], (oldLinks: LinkData[] | undefined) => {
-        if (!oldLinks) return oldLinks;
-        return oldLinks.filter(link => link.id !== deletedId);
-      });
+      queryClient.setQueryData(
+        ["links"],
+        (oldLinks: LinkData[] | undefined) => {
+          if (!oldLinks) return oldLinks;
+          return oldLinks.filter((link) => link.id !== deletedId);
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["links"] });
     },
   });
@@ -1258,32 +1271,35 @@ export default function MicrositeStudioPage() {
     }));
   }, []);
 
-  const handleUsernameUpdate = useCallback(async (newUsername: string): Promise<boolean> => {
-    if (!currentProfile) return false;
+  const handleUsernameUpdate = useCallback(
+    async (newUsername: string): Promise<boolean> => {
+      if (!currentProfile) return false;
 
-    try {
-      const payload = {
-        id: currentProfile.id,
-        username: newUsername.trim(),
-        displayName: currentProfile.displayName,
-        bio: currentProfile.bio,
-        avatar: currentProfile.avatar,
-        isPublic: currentProfile.isPublic,
-        socialLinks: currentProfile.socialLinks,
-        layoutVariant: currentProfile.layoutVariant ?? "default",
-        schemeVariant: currentProfile.schemeVariant ?? "theme1",
-        buttonVariant: currentProfile.buttonVariant ?? "default",
-      };
+      try {
+        const payload = {
+          id: currentProfile.id,
+          username: newUsername.trim(),
+          displayName: currentProfile.displayName,
+          bio: currentProfile.bio,
+          avatar: currentProfile.avatar,
+          isPublic: currentProfile.isPublic,
+          socialLinks: currentProfile.socialLinks,
+          layoutVariant: currentProfile.layoutVariant ?? "default",
+          schemeVariant: currentProfile.schemeVariant ?? "theme1",
+          buttonVariant: currentProfile.buttonVariant ?? "default",
+        };
 
-      await updateProfileMutation.mutateAsync(payload);
-      toast.success("Username updated successfully!");
-      return true;
-    } catch (error) {
-      console.error("Error updating username:", error);
-      toast.error("Failed to update username");
-      return false;
-    }
-  }, [currentProfile, updateProfileMutation]);
+        await updateProfileMutation.mutateAsync(payload);
+        toast.success("Username updated successfully!");
+        return true;
+      } catch (error) {
+        console.error("Error updating username:", error);
+        toast.error("Failed to update username");
+        return false;
+      }
+    },
+    [currentProfile, updateProfileMutation]
+  );
 
   const handleLinkUpdate = useCallback(
     (linkId: string, updates: Partial<LinkData>) => {
@@ -1445,9 +1461,18 @@ export default function MicrositeStudioPage() {
               ? validSocialLinks
               : undefined,
           // Include design variant fields
-          layoutVariant: pendingChanges.profile.layoutVariant ?? currentProfile.layoutVariant ?? "default",
-          schemeVariant: pendingChanges.profile.schemeVariant ?? currentProfile.schemeVariant ?? "theme1",
-          buttonVariant: pendingChanges.profile.buttonVariant ?? currentProfile.buttonVariant ?? "default",
+          layoutVariant:
+            pendingChanges.profile.layoutVariant ??
+            currentProfile.layoutVariant ??
+            "default",
+          schemeVariant:
+            pendingChanges.profile.schemeVariant ??
+            currentProfile.schemeVariant ??
+            "theme1",
+          buttonVariant:
+            pendingChanges.profile.buttonVariant ??
+            currentProfile.buttonVariant ??
+            "default",
         };
         promises.push(updateProfileMutation.mutateAsync(profilePayload));
       }
@@ -1471,7 +1496,7 @@ export default function MicrositeStudioPage() {
       await Promise.all(promises);
 
       // Wait a brief moment to ensure query data has been updated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Clear pending changes only after all updates are complete
       setPendingChanges({
@@ -1513,30 +1538,6 @@ export default function MicrositeStudioPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Microsite Studio</h1>
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary hover:underline"
-          >
-            {publicUrl}
-          </a>
-        </div>
-
-        <Button
-          onClick={handleSaveAll}
-          disabled={!pendingChanges.hasChanges}
-          className="min-w-[140px]"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          Save All Changes
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Editor */}
         <div className="lg:col-span-2 space-y-6">
@@ -1547,57 +1548,51 @@ export default function MicrositeStudioPage() {
             onUsernameUpdate={handleUsernameUpdate}
           />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Links</CardTitle>
-              <Button
-                onClick={() => setAddLinkDialogOpen(true)}
-                variant="outline"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Link
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={orderedLinks.map((link) => link.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-3">
-                    {orderedLinks.map((link) => (
-                      <LinkCard
-                        key={link.id}
-                        link={link}
-                        onUpdate={(updates) =>
-                          handleLinkUpdate(link.id, updates)
-                        }
-                        onDelete={() => handleLinkDelete(link.id)}
-                      />
-                    ))}
-                    {orderedLinks.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <p>No links yet. Add your first link to get started!</p>
-                        <Button
-                          onClick={() => setAddLinkDialogOpen(true)}
-                          variant="outline"
-                          className="mt-4"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Your First Link
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            </CardContent>
-          </Card>
+          <div className="flex justify-between items-center gap-2 border-t pt-6">
+            <h2 className="text-md font-medium">Links</h2>
+            <Button
+              onClick={() => setAddLinkDialogOpen(true)}
+              variant="outline"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Link
+            </Button>
+          </div>
 
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={orderedLinks.map((link) => link.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {orderedLinks.map((link) => (
+                  <LinkCard
+                    key={link.id}
+                    link={link}
+                    onUpdate={(updates) => handleLinkUpdate(link.id, updates)}
+                    onDelete={() => handleLinkDelete(link.id)}
+                  />
+                ))}
+                {orderedLinks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No links yet. Add your first link to get started!</p>
+                    <Button
+                      onClick={() => setAddLinkDialogOpen(true)}
+                      variant="outline"
+                      className="mt-4"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Link
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
           <DesignSection
             profile={currentProfile}
             pendingProfile={pendingChanges.profile}
@@ -1607,7 +1602,7 @@ export default function MicrositeStudioPage() {
 
         {/* Preview */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="sticky top-20 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <Preview
               profile={{
                 ...currentProfile,
@@ -1617,8 +1612,7 @@ export default function MicrositeStudioPage() {
                   currentProfile.displayName,
                 bio: pendingChanges.profile.bio ?? currentProfile.bio,
                 isPublic:
-                  pendingChanges.profile.isPublic ??
-                  currentProfile.isPublic,
+                  pendingChanges.profile.isPublic ?? currentProfile.isPublic,
                 socialLinks:
                   pendingChanges.profile.socialLinks ??
                   currentProfile.socialLinks,

@@ -1,16 +1,22 @@
-"use client"
+"use client";
 
-import React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Check, Layout, Store } from "lucide-react"
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Check, Layout, Store } from "lucide-react";
 
 interface LayoutOption {
-  id: "default" | "store"
-  name: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  preview: React.ReactNode
+  id: "default" | "store";
+  name: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  preview: React.ReactNode;
 }
 
 const layoutOptions: LayoutOption[] = [
@@ -32,7 +38,7 @@ const layoutOptions: LayoutOption[] = [
           <div className="h-6 bg-primary/10 rounded"></div>
         </div>
       </div>
-    )
+    ),
   },
   {
     id: "store",
@@ -53,13 +59,13 @@ const layoutOptions: LayoutOption[] = [
           <div className="h-12 bg-primary/10 rounded"></div>
         </div>
       </div>
-    )
-  }
-]
+    ),
+  },
+];
 
 interface LayoutSelectorProps {
-  value: "default" | "store"
-  onValueChange: (value: "default" | "store") => void
+  value: "default" | "store";
+  onValueChange: (value: "default" | "store") => void;
 }
 
 export function LayoutSelector({ value, onValueChange }: LayoutSelectorProps) {
@@ -74,16 +80,16 @@ export function LayoutSelector({ value, onValueChange }: LayoutSelectorProps) {
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {layoutOptions.map((layout) => {
-            const Icon = layout.icon
-            const isSelected = value === layout.id
-            
+            const Icon = layout.icon;
+            const isSelected = value === layout.id;
+
             return (
               <Button
                 key={layout.id}
                 variant="outline"
                 className={`h-auto p-4 flex flex-col items-start gap-3 relative ${
-                  isSelected 
-                    ? "border-primary bg-primary/5 hover:bg-primary/10" 
+                  isSelected
+                    ? "border-primary bg-primary/5 hover:bg-primary/10"
                     : "hover:bg-muted/50"
                 }`}
                 onClick={() => onValueChange(layout.id)}
@@ -93,24 +99,22 @@ export function LayoutSelector({ value, onValueChange }: LayoutSelectorProps) {
                     <Check className="w-3 h-3 text-primary-foreground" />
                   </div>
                 )}
-                
+
                 <div className="flex items-center gap-2 w-full">
                   <Icon className="w-5 h-5 text-primary" />
                   <span className="font-medium text-left">{layout.name}</span>
                 </div>
-                
-                <p className="text-sm text-muted-foreground text-left">
+
+                <p className="text-sm text-muted-foreground text-left max-w-xs ">
                   {layout.description}
                 </p>
-                
-                <div className="w-full">
-                  {layout.preview}
-                </div>
+
+                <div className="w-full">{layout.preview}</div>
               </Button>
-            )
+            );
           })}
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,15 +1,27 @@
-"use client"
+"use client";
 
-import React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-type ButtonVariant = "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+type ButtonVariant =
+  | "default"
+  | "destructive"
+  | "outline"
+  | "secondary"
+  | "ghost"
+  | "link";
 
 interface ButtonVariantOption {
-  id: ButtonVariant
-  name: string
-  description: string
+  id: ButtonVariant;
+  name: string;
+  description: string;
 }
 
 const buttonVariants: ButtonVariantOption[] = [
@@ -18,15 +30,18 @@ const buttonVariants: ButtonVariantOption[] = [
   { id: "outline", name: "Outline", description: "Transparent with border" },
   { id: "secondary", name: "Secondary", description: "Subtle gray styling" },
   { id: "ghost", name: "Ghost", description: "Minimal hover effect" },
-  { id: "link", name: "Link", description: "Text-only link style" }
-]
+  { id: "link", name: "Link", description: "Text-only link style" },
+];
 
 interface ButtonVariantSelectorProps {
-  value: ButtonVariant
-  onValueChange: (value: ButtonVariant) => void
+  value: ButtonVariant;
+  onValueChange: (value: ButtonVariant) => void;
 }
 
-export function ButtonVariantSelector({ value, onValueChange }: ButtonVariantSelectorProps) {
+export function ButtonVariantSelector({
+  value,
+  onValueChange,
+}: ButtonVariantSelectorProps) {
   return (
     <Card>
       <CardHeader>
@@ -54,14 +69,7 @@ export function ButtonVariantSelector({ value, onValueChange }: ButtonVariantSel
             </Button>
           ))}
         </div>
-        
-        <div className="mt-4 p-3 bg-muted/50 rounded-md">
-          <p className="text-sm text-muted-foreground mb-2">Preview:</p>
-          <Button variant={value} size="sm">
-            Sample Link
-          </Button>
-        </div>
       </CardContent>
     </Card>
-  )
+  );
 }
